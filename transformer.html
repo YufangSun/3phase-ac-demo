@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer Demo — Step Up / Step Down</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117; color: #e6edf3;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 1.6em; color: #e0e0ff; }
+  .subtitle { color: #7d8590; margin-bottom: 10px; font-size: 0.95em; text-align: center; }
+  canvas { display: block; border-radius: 10px; }
+  .row {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    justify-content: center; margin-top: 14px; max-width: 1200px; width: 100%;
+  }
+  .panel {
+    background: #161b22; border-radius: 12px; padding: 14px;
+    border: 1px solid #30363d; flex: 1; min-width: 260px;
+  }
+  .panel h2 { font-size: 0.9em; color: #8b949e; margin-bottom: 6px; text-align: center; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px;
+    justify-content: center; align-items: center;
+  }
+  .cg { display: flex; align-items: center; gap: 5px; }
+  .cg label { font-size: 0.8em; color: #8b949e; white-space: nowrap; }
+  input[type="range"] { width: 100px; accent-color: #f78166; }
+  .val { font-size: 0.8em; color: #f78166; min-width: 40px; }
+  select {
+    background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+    padding: 4px 8px; border-radius: 4px; font-size: 0.82em;
+  }
+  button {
+    background: #238636; color: white; border: none;
+    padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em;
+  }
+  button:hover { background: #2ea043; }
+  button.sec { background: #30363d; }
+  button.sec:hover { background: #484f58; }
+  .meters {
+    display: flex; gap: 12px; justify-content: center; margin-top: 10px; flex-wrap: wrap;
+  }
+  .meter {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 6px 12px; text-align: center; min-width: 110px;
+  }
+  .meter .ml { font-size: 0.72em; color: #8b949e; }
+  .meter .mv { font-size: 1em; font-weight: bold; font-family: 'Courier New', monospace; }
+  .legend {
+    display: flex; gap: 14px; justify-content: center; margin: 8px 0; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.78em; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .info {
+    max-width: 1200px; width: 100%;
+    background: #161b22; border-radius: 12px;
+    padding: 14px 18px; border: 1px solid #30363d;
+    margin-top: 14px; font-size: 0.85em; line-height: 1.6; color: #8b949e;
+  }
+  .info strong { color: #e0e0ff; }
+  .info code { color: #f78166; background: #21262d; padding: 1px 4px; border-radius: 3px; }
+  a { color: #58a6ff; }
+  .type-badge {
+    display: inline-block; padding: 3px 12px; border-radius: 12px;
+    font-size: 0.85em; font-weight: bold; margin: 6px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>Transformer</h1>
+<p class="subtitle">See how turns ratio transforms voltage &amp; current — energy flows from primary to secondary</p>
+<div id="typeBadge" class="type-badge" style="background:#238636;color:white;">1:1 — Isolation Transformer</div>
+
+<canvas id="mainCanvas" width="1100" height="440"></canvas>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div> AC Source</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f97583"></div> Primary (V₁, I₁)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#79c0ff"></div> Secondary (V₂, I₂)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d2a8ff"></div> Core flux Φ</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7ee787"></div> Load</div>
+</div>
+
+<div class="meters">
+  <div class="meter"><div class="ml">V₁ (primary)</div><div class="mv" id="mV1" style="color:#f97583">0.00 V</div></div>
+  <div class="meter"><div class="ml">I₁ (primary)</div><div class="mv" id="mI1" style="color:#f97583">0.00 A</div></div>
+  <div class="meter"><div class="ml">V₂ (secondary)</div><div class="mv" id="mV2" style="color:#79c0ff">0.00 V</div></div>
+  <div class="meter"><div class="ml">I₂ (secondary)</div><div class="mv" id="mI2" style="color:#79c0ff">0.00 A</div></div>
+  <div class="meter"><div class="ml">P₁ (input)</div><div class="mv" id="mP1" style="color:#f97583">0.00 W</div></div>
+  <div class="meter"><div class="ml">P₂ (output)</div><div class="mv" id="mP2" style="color:#7ee787">0.00 W</div></div>
+  <div class="meter"><div class="ml">Efficiency</div><div class="mv" id="mEff" style="color:#d2a8ff">0 %</div></div>
+  <div class="meter"><div class="ml">Turns ratio</div><div class="mv" id="mRatio" style="color:#ffa657">1 : 1</div></div>
+</div>
+
+<div class="row">
+  <div class="panel">
+    <h2>Voltage Waveforms</h2>
+    <canvas id="voltCanvas" width="560" height="200"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Current Waveforms</h2>
+    <canvas id="currCanvas" width="560" height="200"></canvas>
+  </div>
+</div>
+<div class="row">
+  <div class="panel">
+    <h2>Instantaneous Power</h2>
+    <canvas id="powerCanvas" width="560" height="180"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Core Flux Φ</h2>
+    <canvas id="fluxCanvas" width="560" height="180"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="cg">
+    <label>N₁ (primary turns):</label>
+    <input type="range" id="n1Slider" min="1" max="20" step="1" value="10">
+    <span class="val" id="n1Val">10</span>
+  </div>
+  <div class="cg">
+    <label>N₂ (secondary turns):</label>
+    <input type="range" id="n2Slider" min="1" max="20" step="1" value="10">
+    <span class="val" id="n2Val">10</span>
+  </div>
+  <div class="cg">
+    <label>Vs peak (V):</label>
+    <input type="range" id="vsSlider" min="1" max="20" step="0.5" value="10">
+    <span class="val" id="vsVal">10 V</span>
+  </div>
+  <div class="cg">
+    <label>Frequency:</label>
+    <input type="range" id="freqSlider" min="0.3" max="4" step="0.1" value="1.2">
+    <span class="val" id="freqVal">1.2 Hz</span>
+  </div>
+  <div class="cg">
+    <label>R_load (Ω):</label>
+    <input type="range" id="rlSlider" min="0.5" max="30" step="0.5" value="5">
+    <span class="val" id="rlVal">5 Ω</span>
+  </div>
+  <div class="cg">
+    <label>Core loss:</label>
+    <input type="range" id="clossSlider" min="0" max="0.3" step="0.01" value="0.02">
+    <span class="val" id="clossVal">0.02</span>
+  </div>
+  <div class="cg">
+    <label>Preset:</label>
+    <select id="presetSel">
+      <option value="">Custom</option>
+      <option value="stepdown">Step-Down 2:1</option>
+      <option value="stepup">Step-Up 1:3</option>
+      <option value="isolation">Isolation 1:1</option>
+      <option value="heavy">Heavy Load</option>
+      <option value="noload">No Load (open)</option>
+    </select>
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="resetBtn" class="sec">Reset</button>
+</div>
+
+<div class="info">
+  <strong>Transformer Principles:</strong>
+  A transformer transfers AC energy between two coils via a shared magnetic core.
+  The voltage ratio follows the turns ratio: <code>V₂/V₁ = N₂/N₁</code>.
+  Current transforms inversely: <code>I₂/I₁ = N₁/N₂</code>, conserving power (<code>P₁ ≈ P₂</code> in an ideal transformer).
+  <br>
+  <strong>Step-down</strong> (N₂ &lt; N₁): lower voltage, higher current.
+  <strong>Step-up</strong> (N₂ &gt; N₁): higher voltage, lower current.
+  Core losses (hysteresis + eddy currents) and winding resistance reduce real-world efficiency.
+  <br><br>
+  <a href="index.html">← 3-Phase AC</a> ·
+  <a href="mutual-inductance.html">Mutual Inductance</a> ·
+  <a href="bounce-diagram.html">Bounce Diagram</a>
+</div>
+
+<script>
+const mainC = document.getElementById('mainCanvas');
+const voltC = document.getElementById('voltCanvas');
+const currC = document.getElementById('currCanvas');
+const powerC = document.getElementById('powerCanvas');
+const fluxC  = document.getElementById('fluxCanvas');
+const mCtx = mainC.getContext('2d');
+const vCtx = voltC.getContext('2d');
+const cCtx = currC.getContext('2d');
+const pCtx = powerC.getContext('2d');
+const fCtx = fluxC.getContext('2d');
+
+const n1Slider = document.getElementById('n1Slider');
+const n2Slider = document.getElementById('n2Slider');
+const vsSlider = document.getElementById('vsSlider');
+const freqSlider = document.getElementById('freqSlider');
+const rlSlider = document.getElementById('rlSlider');
+const clossSlider = document.getElementById('clossSlider');
+
+const sls = [
+  [n1Slider,'n1Val',v=>v],
+  [n2Slider,'n2Val',v=>v],
+  [vsSlider,'vsVal',v=>v+' V'],
+  [freqSlider,'freqVal',v=>v+' Hz'],
+  [rlSlider,'rlVal',v=>v+' Ω'],
+  [clossSlider,'clossVal',v=>v],
+];
+sls.forEach(([s,id,f])=>{ s.oninput=()=>document.getElementById(id).textContent=f(s.value); });
+
+// Presets
+document.getElementById('presetSel').onchange = function() {
+  const p = this.value;
+  if(p==='stepdown'){n1Slider.value=10;n2Slider.value=5;vsSlider.value=10;rlSlider.value=5;}
+  if(p==='stepup'){n1Slider.value=4;n2Slider.value=12;vsSlider.value=6;rlSlider.value=10;}
+  if(p==='isolation'){n1Slider.value=10;n2Slider.value=10;vsSlider.value=10;rlSlider.value=5;}
+  if(p==='heavy'){n1Slider.value=10;n2Slider.value=10;vsSlider.value=10;rlSlider.value=1;}
+  if(p==='noload'){n1Slider.value=10;n2Slider.value=5;vsSlider.value=10;rlSlider.value=30;}
+  sls.forEach(([s,id,f])=>document.getElementById(id).textContent=f(s.value));
+  resetSim();
+};
+
+let time=0, paused=false, lastTs=0;
+let I1=0, I2=0, Phi=0;
+let avgP1=0, avgP2=0;
+
+const HIST=400;
+const h = {
+  V1:new Float32Array(HIST), V2:new Float32Array(HIST),
+  I1:new Float32Array(HIST), I2:new Float32Array(HIST),
+  P1:new Float32Array(HIST), P2:new Float32Array(HIST),
+  Phi:new Float32Array(HIST),
+};
+let hIdx=0;
+
+document.getElementById('pauseBtn').onclick=function(){paused=!paused;this.textContent=paused?'Play':'Pause';};
+document.getElementById('resetBtn').onclick=resetSim;
+function resetSim(){
+  time=0;I1=0;I2=0;Phi=0;hIdx=0;avgP1=0;avgP2=0;
+  Object.values(h).forEach(a=>a.fill(0));
+  paused=false;document.getElementById('pauseBtn').textContent='Pause';
+}
+
+/* ---- PHYSICS ---- */
+function simulate(dt){
+  const N1=parseInt(n1Slider.value);
+  const N2=parseInt(n2Slider.value);
+  const Vp=parseFloat(vsSlider.value);
+  const freq=parseFloat(freqSlider.value);
+  const RL=parseFloat(rlSlider.value);
+  const Rc=parseFloat(clossSlider.value);
+  const n=N2/N1; // turns ratio
+
+  // Transformer model: coupled inductors on ideal core
+  // L1 = N1², L2 = N2², M = N1*N2 (normalized, k≈0.98)
+  const k=0.98;
+  const L1=N1*N1*0.01; // scale factor
+  const L2=N2*N2*0.01;
+  const M=k*Math.sqrt(L1*L2);
+  const R1=0.15*N1*0.1; // winding resistance
+  const R2=0.15*N2*0.1;
+  const Rcore = Rc > 0 ? 1/Rc : 1e6; // core loss as parallel resistance
+
+  const Vs=Vp*Math.sin(2*Math.PI*freq*time);
+
+  // RK4
+  const det=L1*L2-M*M;
+  if(Math.abs(det)<1e-8) return {Vs,V2:0,Phi:0};
+
+  const derivs=(i1,i2,t)=>{
+    const vs=Vp*Math.sin(2*Math.PI*freq*t);
+    const di1=(L2*(vs-R1*i1)-M*(-(R2+RL)*i2))/det;
+    const di2=(L1*(-(R2+RL)*i2)-M*(vs-R1*i1))/det;
+    return [di1,di2];
+  };
+
+  const steps=10;
+  const step=dt/steps;
+  for(let s=0;s<steps;s++){
+    const t0=time+s*step;
+    const [k1a,k1b]=derivs(I1,I2,t0);
+    const [k2a,k2b]=derivs(I1+step/2*k1a,I2+step/2*k1b,t0+step/2);
+    const [k3a,k3b]=derivs(I1+step/2*k2a,I2+step/2*k2b,t0+step/2);
+    const [k4a,k4b]=derivs(I1+step*k3a,I2+step*k3b,t0+step);
+    I1+=step/6*(k1a+2*k2a+2*k3a+k4a);
+    I2+=step/6*(k1b+2*k2b+2*k3b+k4b);
+  }
+
+  // Core flux
+  Phi=(L1*I1+M*I2)/N1*100; // scaled for display
+
+  const V1=Vs;
+  const V2=RL*I2;
+  const P1=V1*I1;
+  const P2=V2*I2;
+
+  return {Vs,V1,V2,P1,P2,N1,N2,n,RL,Phi,L1,L2,M,R1,R2};
+}
+
+/* ---- PARTICLES ---- */
+const particles=[];
+function spawnP(x0,y0,x1,y1,color,arcH){
+  particles.push({x0,y0,x1,y1,color,arcH:arcH||40,
+    t:0,spd:0.005+Math.random()*0.008,
+    sz:1.5+Math.random()*2,yR:(Math.random()-0.5)*20});
+}
+function drawParticles(ctx){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.t+=p.spd;
+    if(p.t>=1){particles.splice(i,1);continue;}
+    const t=p.t;
+    const x=p.x0+(p.x1-p.x0)*t;
+    const y=p.y0+(p.y1-p.y0)*t - p.arcH*Math.sin(Math.PI*t) + p.yR*Math.sin(Math.PI*t);
+    const alpha=Math.sin(Math.PI*t)*0.85;
+    ctx.beginPath();ctx.arc(x,y,p.sz,0,Math.PI*2);
+    ctx.fillStyle=p.color.replace(',1)',`,${alpha})`);
+    ctx.shadowColor=p.color.replace(',1)',',0.6)');
+    ctx.shadowBlur=6;ctx.fill();ctx.shadowBlur=0;
+  }
+}
+
+/* ---- DRAW TRANSFORMER CORE ---- */
+function drawCore(ctx,cx,cy,W,H,fluxVal){
+  const thick=18;
+  const r=8;
+  const absFlux=Math.min(1,Math.abs(fluxVal)*0.15);
+
+  // Core glow
+  if(absFlux>0.02){
+    const g=ctx.createRadialGradient(cx,cy,20,cx,cy,W/2+30);
+    g.addColorStop(0,`rgba(210,168,255,${absFlux*0.15})`);
+    g.addColorStop(1,'rgba(210,168,255,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(cx-W/2-30,cy-H/2-30,W+60,H+60);
+  }
+
+  // Draw E-I core shape
+  ctx.fillStyle=`rgb(${55+absFlux*30},${60+absFlux*20},${72+absFlux*20})`;
+  ctx.strokeStyle='#484f58';
+  ctx.lineWidth=1;
+
+  // Top bar
+  ctx.beginPath();ctx.roundRect(cx-W/2,cy-H/2,W,thick,r);ctx.fill();ctx.stroke();
+  // Bottom bar
+  ctx.beginPath();ctx.roundRect(cx-W/2,cy+H/2-thick,W,thick,r);ctx.fill();ctx.stroke();
+  // Left leg
+  ctx.beginPath();ctx.roundRect(cx-W/2,cy-H/2,thick,H,r);ctx.fill();ctx.stroke();
+  // Right leg
+  ctx.beginPath();ctx.roundRect(cx+W/2-thick,cy-H/2,thick,H,r);ctx.fill();ctx.stroke();
+  // Center leg
+  ctx.beginPath();ctx.roundRect(cx-thick/2,cy-H/2,thick,H,r);ctx.fill();ctx.stroke();
+
+  // Flux arrows in core
+  if(absFlux>0.03){
+    const alpha=Math.min(0.7,absFlux);
+    const dir=fluxVal>0?1:-1;
+    ctx.fillStyle=`rgba(210,168,255,${alpha})`;
+    ctx.font='14px sans-serif';
+    ctx.textAlign='center';
+
+    // Animated dots in core legs
+    const dotCount=6;
+    const speed=time*3*dir;
+    for(let d=0;d<dotCount;d++){
+      const phase=((speed+d/dotCount)%1+1)%1;
+
+      // Left window (counterclockwise): top→left→bottom→right(center)
+      const leftPath=[
+        // top segment left
+        [cx-W/2+thick, cy-H/2+thick/2, cx-thick/2, cy-H/2+thick/2],
+        // center down
+        [cx-thick/2, cy-H/2+thick, cx-thick/2, cy+H/2-thick],
+        // bottom segment left
+        [cx-thick/2, cy+H/2-thick/2, cx-W/2+thick, cy+H/2-thick/2],
+        // left leg up
+        [cx-W/2+thick/2, cy+H/2-thick, cx-W/2+thick/2, cy-H/2+thick],
+      ];
+
+      // Right window
+      const rightPath=[
+        [cx+thick/2, cy-H/2+thick/2, cx+W/2-thick, cy-H/2+thick/2],
+        [cx+W/2-thick/2, cy-H/2+thick, cx+W/2-thick/2, cy+H/2-thick],
+        [cx+W/2-thick, cy+H/2-thick/2, cx+thick/2, cy+H/2-thick/2],
+        [cx+thick/2, cy+H/2-thick, cx+thick/2, cy-H/2+thick],
+      ];
+
+      [leftPath,rightPath].forEach(path=>{
+        const totalSegs=path.length;
+        const segIdx=Math.floor(phase*totalSegs);
+        const segT=(phase*totalSegs)%1;
+        const seg=path[segIdx%totalSegs];
+        const px=seg[0]+(seg[2]-seg[0])*segT;
+        const py=seg[1]+(seg[3]-seg[1])*segT;
+        ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);
+        ctx.fillStyle=`rgba(210,168,255,${alpha*0.8})`;
+        ctx.fill();
+      });
+    }
+
+    // Phi label
+    ctx.fillStyle=`rgba(210,168,255,${alpha})`;
+    ctx.font='bold 12px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('Φ',cx,cy);
+  }
+}
+
+/* ---- DRAW WINDINGS ON CORE ---- */
+function drawWindings(ctx,cx,cy,coreW,coreH,N,side,color,current){
+  const thick=18;
+  const legX=side==='left' ? cx-coreW/2+thick+4 : cx+coreW/2-thick-4;
+  const windW=22;
+  const windH=coreH-thick*2-10;
+  const turnSpacing=windH/Math.max(N,1);
+  const startY=cy-windH/2;
+  const intensity=Math.min(1,Math.abs(current)*0.8);
+
+  // Glow
+  if(intensity>0.03){
+    const g=ctx.createRadialGradient(legX+(side==='left'?-windW:windW),cy,5,
+      legX+(side==='left'?-windW:windW),cy,60);
+    g.addColorStop(0,color+Math.round(intensity*40).toString(16).padStart(2,'0'));
+    g.addColorStop(1,color+'00');
+    ctx.fillStyle=g;
+    ctx.fillRect(legX-60,cy-80,120,160);
+  }
+
+  const wx=side==='left'?legX-windW:legX+windW;
+  const dispN=Math.min(N,12); // max visible turns
+  const dSpacing=windH/Math.max(dispN,1);
+
+  for(let i=0;i<dispN;i++){
+    const ty=startY+i*dSpacing+dSpacing/2;
+    const pulse=Math.sin(time*8+i*0.5)*Math.min(1,Math.abs(current))*3;
+
+    // Front half (visible)
+    ctx.strokeStyle=color;
+    ctx.lineWidth=2.5;
+    ctx.shadowColor=color;
+    ctx.shadowBlur=intensity*10;
+    ctx.beginPath();
+    if(side==='left'){
+      ctx.ellipse(legX-2+pulse,ty,windW,dSpacing*0.35,0,Math.PI*0.5,Math.PI*1.5,false);
+    } else {
+      ctx.ellipse(legX+2+pulse,ty,windW,dSpacing*0.35,0,-Math.PI*0.5,Math.PI*0.5,false);
+    }
+    ctx.stroke();
+
+    // Back half (dimmed)
+    ctx.strokeStyle=color+'50';
+    ctx.shadowBlur=0;
+    ctx.beginPath();
+    if(side==='left'){
+      ctx.ellipse(legX-2+pulse,ty,windW,dSpacing*0.35,0,Math.PI*1.5,Math.PI*0.5,false);
+    } else {
+      ctx.ellipse(legX+2+pulse,ty,windW,dSpacing*0.35,0,Math.PI*0.5,Math.PI*-0.5,false);
+    }
+    ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+
+  // N label
+  ctx.fillStyle=color;
+  ctx.font='bold 11px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('N'+(side==='left'?'₁':'₂')+'='+N,wx,cy-windH/2-14);
+
+  // Current indicator
+  if(Math.abs(current)>0.02){
+    const arrowX=side==='left'?wx-18:wx+18;
+    const dir=current>0?1:-1;
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(arrowX,cy-12);ctx.lineTo(arrowX,cy+12);ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(arrowX,cy+12*dir);
+    ctx.lineTo(arrowX-4,cy+7*dir);
+    ctx.moveTo(arrowX,cy+12*dir);
+    ctx.lineTo(arrowX+4,cy+7*dir);
+    ctx.stroke();
+  }
+}
+
+/* ---- DRAW AC SOURCE ---- */
+function drawSrc(ctx,cx,cy,V,Vp){
+  ctx.strokeStyle='#ffa657';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cx,cy,24,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();
+  for(let i=-14;i<=14;i++){
+    const x=cx+i,y=cy-Math.sin(i/14*Math.PI*2)*7;
+    i===-14?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  const g=Math.abs(V/Vp);
+  if(g>0.05){
+    const grd=ctx.createRadialGradient(cx,cy,4,cx,cy,40);
+    grd.addColorStop(0,`rgba(255,166,87,${g*0.25})`);
+    grd.addColorStop(1,'rgba(255,166,87,0)');
+    ctx.fillStyle=grd;ctx.fillRect(cx-40,cy-40,80,80);
+  }
+  ctx.fillStyle='#ffa657';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('AC',cx,cy-32);
+  ctx.font='10px sans-serif';
+  ctx.fillText(V.toFixed(1)+'V',cx,cy+40);
+}
+
+/* ---- DRAW LOAD ---- */
+function drawLd(ctx,cx,cy,P,RL){
+  const g=Math.min(1,Math.abs(P)*0.15);
+  if(g>0.03){
+    const grd=ctx.createRadialGradient(cx,cy,4,cx,cy,45);
+    grd.addColorStop(0,`rgba(126,231,135,${g*0.3})`);
+    grd.addColorStop(1,'rgba(126,231,135,0)');
+    ctx.fillStyle=grd;ctx.fillRect(cx-45,cy-45,90,90);
+  }
+  // Resistor box
+  ctx.strokeStyle='#7ee787';ctx.lineWidth=2;
+  ctx.beginPath();ctx.roundRect(cx-16,cy-22,32,44,4);ctx.stroke();
+  // Zigzag inside
+  ctx.beginPath();
+  ctx.moveTo(cx,cy-16);
+  for(let i=0;i<4;i++){
+    ctx.lineTo(cx+(i%2===0?8:-8),cy-16+(i+0.5)*8);
+  }
+  ctx.lineTo(cx,cy+16);
+  ctx.stroke();
+
+  ctx.fillStyle='#7ee787';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Load',cx,cy-30);
+  ctx.font='10px sans-serif';
+  ctx.fillText(RL.toFixed(1)+'Ω',cx,cy+36);
+  ctx.fillText(Math.abs(P).toFixed(2)+'W',cx,cy+50);
+}
+
+/* ---- DRAW WIRES WITH CURRENT DOTS ---- */
+function drawWire(ctx,pts,color,curr){
+  ctx.strokeStyle=color+'60';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+
+  if(Math.abs(curr)<0.01)return;
+  let totalL=0;
+  for(let i=1;i<pts.length;i++)totalL+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);
+  const nDots=3;
+  const speed=curr*time*60;
+  for(let d=0;d<nDots;d++){
+    let target=((speed+d*totalL/nDots)%totalL+totalL)%totalL;
+    let acc=0;
+    for(let i=1;i<pts.length;i++){
+      const seg=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);
+      if(acc+seg>=target){
+        const t=(target-acc)/seg;
+        ctx.beginPath();
+        ctx.arc(pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t,
+                pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t,2.5,0,Math.PI*2);
+        ctx.fillStyle=color;ctx.fill();
+        break;
+      }
+      acc+=seg;
+    }
+  }
+}
+
+/* ---- MAIN SCENE ---- */
+function drawMain(sim){
+  const W=mainC.width,H=mainC.height;
+  mCtx.clearRect(0,0,W,H);
+
+  const cx=W/2, cy=H/2-10;
+  const coreW=200, coreH=200;
+
+  // Positions
+  const srcX=80, srcY=cy;
+  const loadX=W-80, loadY=cy;
+  const primX=cx-coreW/2-30;
+  const secX=cx+coreW/2+30;
+
+  // Wires primary side
+  drawWire(mCtx,[[srcX+24,srcY-15],[primX-20,cy-70]],   '#f97583',I1);
+  drawWire(mCtx,[[srcX+24,srcY+15],[primX-20,cy+70]],   '#f97583',I1);
+
+  // Wires secondary side
+  drawWire(mCtx,[[secX+20,cy-70],[loadX-16,loadY-22]],  '#79c0ff',I2);
+  drawWire(mCtx,[[secX+20,cy+70],[loadX-16,loadY+22]],  '#79c0ff',I2);
+
+  // Energy transfer particles
+  const pwr=Math.abs(sim.P2);
+  if(Math.random()<pwr*0.04 && particles.length<80){
+    spawnP(cx-coreW/4,cy,cx+coreW/4,cy,'rgba(255,166,87,1)',50);
+  }
+  drawParticles(mCtx);
+
+  // Core
+  drawCore(mCtx,cx,cy,coreW,coreH,sim.Phi);
+
+  // Windings
+  drawWindings(mCtx,cx,cy,coreW,coreH,sim.N1,'left','#f97583',I1);
+  drawWindings(mCtx,cx,cy,coreW,coreH,sim.N2,'right','#79c0ff',I2);
+
+  // Source & Load
+  drawSrc(mCtx,srcX,srcY,sim.Vs,parseFloat(vsSlider.value));
+  drawLd(mCtx,loadX,loadY,sim.P2,parseFloat(rlSlider.value));
+
+  // Power flow label
+  if(pwr>0.05){
+    const alpha=Math.min(0.8,pwr*0.1);
+    mCtx.fillStyle=`rgba(255,166,87,${alpha})`;
+    mCtx.font='11px sans-serif';
+    mCtx.textAlign='center';
+    mCtx.fillText('⚡ '+pwr.toFixed(2)+' W →',cx,cy+coreH/2+30);
+  }
+
+  // Voltage annotations
+  mCtx.font='bold 12px sans-serif';
+  mCtx.textAlign='center';
+  mCtx.fillStyle='#f97583';
+  mCtx.fillText('V₁='+sim.V1.toFixed(1)+'V',primX-30,cy-coreH/2-10);
+  mCtx.fillStyle='#79c0ff';
+  mCtx.fillText('V₂='+sim.V2.toFixed(1)+'V',secX+30,cy-coreH/2-10);
+}
+
+/* ---- CHART HELPER ---- */
+function drawChart(ctx,canvas,datasets,zeroBottom){
+  const W=canvas.width,H=canvas.height;
+  const pad={l:45,r:15,t:12,b:18};
+  const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=pad.t+(i/5)*pH;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pW,y);ctx.stroke();
+  }
+
+  const midY=zeroBottom?pad.t+pH:pad.t+pH/2;
+  ctx.strokeStyle='#ffffff20';
+  ctx.beginPath();ctx.moveTo(pad.l,midY);ctx.lineTo(pad.l+pW,midY);ctx.stroke();
+
+  let maxVal=0.5;
+  datasets.forEach(d=>{for(let i=0;i<HIST;i++)maxVal=Math.max(maxVal,Math.abs(d.data[i]));});
+  maxVal*=1.15;
+
+  const scaleY=zeroBottom?pH:pH/2;
+
+  datasets.forEach(({data,color,label,dash,width})=>{
+    ctx.strokeStyle=color;ctx.lineWidth=width||2;
+    if(dash)ctx.setLineDash(dash);
+    ctx.beginPath();
+    for(let i=0;i<HIST;i++){
+      const idx=(hIdx-HIST+i+HIST*2)%HIST;
+      const x=pad.l+(i/HIST)*pW;
+      const y=midY-(data[idx]/maxVal)*scaleY;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();ctx.setLineDash([]);
+
+    // Fill for power chart
+    if(zeroBottom){
+      ctx.fillStyle=color.substring(0,7)+'20';
+      ctx.lineTo(pad.l+pW,midY);ctx.lineTo(pad.l,midY);ctx.closePath();ctx.fill();
+    }
+
+    const li=(hIdx-1+HIST)%HIST;
+    const ly=midY-(data[li]/maxVal)*scaleY;
+    ctx.fillStyle=color;ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(label,pad.l+pW+2,Math.max(pad.t+8,Math.min(pad.t+pH-2,ly+3)));
+  });
+
+  ctx.fillStyle='#484f58';ctx.font='9px sans-serif';ctx.textAlign='right';
+  ctx.fillText(zeroBottom?'0':'±',pad.l-4,midY+3);
+}
+
+/* ---- UPDATE TYPE BADGE ---- */
+function updateBadge(N1,N2){
+  const badge=document.getElementById('typeBadge');
+  const r=N2/N1;
+  if(Math.abs(r-1)<0.01){badge.textContent=N1+':'+N2+' — Isolation Transformer';badge.style.background='#238636';}
+  else if(r<1){badge.textContent=N1+':'+N2+' — Step-Down (÷'+( N1/N2).toFixed(1)+')';badge.style.background='#da3633';}
+  else{badge.textContent=N1+':'+N2+' — Step-Up (×'+r.toFixed(1)+')';badge.style.background='#1f6feb';}
+  document.getElementById('mRatio').textContent=N1+' : '+N2;
+}
+
+/* ---- ANIMATION ---- */
+function animate(ts){
+  if(!lastTs)lastTs=ts;
+  const dt=Math.min((ts-lastTs)/1000,0.04);
+  lastTs=ts;
+
+  if(!paused){
+    const sim=simulate(dt);
+    time+=dt;
+
+    const idx=hIdx%HIST;
+    h.V1[idx]=sim.V1; h.V2[idx]=sim.V2;
+    h.I1[idx]=I1; h.I2[idx]=I2;
+    h.P1[idx]=sim.P1; h.P2[idx]=sim.P2;
+    h.Phi[idx]=sim.Phi;
+    hIdx++;
+
+    const a=0.015;
+    avgP1=avgP1*(1-a)+Math.abs(sim.P1)*a;
+    avgP2=avgP2*(1-a)+Math.abs(sim.P2)*a;
+
+    // Update meters
+    document.getElementById('mV1').textContent=sim.V1.toFixed(2)+' V';
+    document.getElementById('mI1').textContent=I1.toFixed(3)+' A';
+    document.getElementById('mV2').textContent=sim.V2.toFixed(2)+' V';
+    document.getElementById('mI2').textContent=I2.toFixed(3)+' A';
+    document.getElementById('mP1').textContent=avgP1.toFixed(2)+' W';
+    document.getElementById('mP2').textContent=avgP2.toFixed(2)+' W';
+    const eff=avgP1>0.01?(avgP2/avgP1*100):0;
+    document.getElementById('mEff').textContent=eff.toFixed(1)+' %';
+    updateBadge(sim.N1,sim.N2);
+
+    drawMain(sim);
+    drawChart(vCtx,voltC,[
+      {data:h.V1,color:'#f97583',label:'V₁'},
+      {data:h.V2,color:'#79c0ff',label:'V₂'},
+    ],false);
+    drawChart(cCtx,currC,[
+      {data:h.I1,color:'#f97583',label:'I₁'},
+      {data:h.I2,color:'#79c0ff',label:'I₂'},
+    ],false);
+    drawChart(pCtx,powerC,[
+      {data:h.P1,color:'#f97583',label:'P₁ in'},
+      {data:h.P2,color:'#7ee787',label:'P₂ out'},
+    ],false);
+    drawChart(fCtx,fluxC,[
+      {data:h.Phi,color:'#d2a8ff',label:'Φ'},
+    ],false);
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
