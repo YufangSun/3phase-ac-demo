@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transmission Line Bounce Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 { font-size: 1.6em; color: #e0e0ff; }
+  .subtitle { color: #7d8590; margin-bottom: 14px; font-size: 0.95em; text-align: center; }
+  .top-row {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    justify-content: center; max-width: 1200px; width: 100%;
+  }
+  .panel {
+    background: #161b22;
+    border-radius: 12px;
+    padding: 14px;
+    border: 1px solid #30363d;
+  }
+  .panel h2 {
+    font-size: 0.92em; color: #8b949e;
+    margin-bottom: 8px; text-align: center;
+  }
+  canvas { display: block; border-radius: 8px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px;
+    justify-content: center; align-items: center;
+  }
+  .control-group { display: flex; align-items: center; gap: 6px; }
+  .control-group label { font-size: 0.82em; color: #8b949e; white-space: nowrap; }
+  input[type="range"] { width: 100px; accent-color: #f78166; }
+  .val { font-size: 0.82em; color: #f78166; min-width: 42px; }
+  select {
+    background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+    padding: 4px 8px; border-radius: 4px; font-size: 0.82em;
+  }
+  button {
+    background: #238636; color: white; border: none;
+    padding: 7px 18px; border-radius: 6px; cursor: pointer;
+    font-size: 0.88em; transition: background 0.2s;
+  }
+  button:hover { background: #2ea043; }
+  button.sec { background: #30363d; }
+  button.sec:hover { background: #484f58; }
+  button.warn { background: #da3633; }
+  button.warn:hover { background: #f85149; }
+  .legend {
+    display: flex; gap: 16px; justify-content: center;
+    margin: 10px 0; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.82em; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .info {
+    max-width: 1200px; width: 100%;
+    background: #161b22; border-radius: 12px;
+    padding: 14px 18px; border: 1px solid #30363d;
+    margin-top: 14px; font-size: 0.88em; line-height: 1.6; color: #8b949e;
+  }
+  .info strong { color: #e0e0ff; }
+  .info code { color: #f78166; background: #21262d; padding: 1px 5px; border-radius: 3px; }
+  a { color: #58a6ff; }
+  .schematic {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; margin: 10px 0; flex-wrap: wrap;
+  }
+  .sch-block {
+    text-align: center; font-size: 0.8em; color: #8b949e; padding: 6px 10px;
+  }
+  .sch-block .val-label { color: #f78166; font-weight: bold; font-size: 1.05em; }
+  .sch-line {
+    width: 80px; height: 2px; background: #58a6ff; position: relative;
+  }
+  .sch-line::after {
+    content: '▶'; position: absolute; right: -6px; top: -9px;
+    color: #58a6ff; font-size: 12px;
+  }
+  .gamma-display {
+    display: flex; gap: 30px; justify-content: center;
+    margin: 6px 0; flex-wrap: wrap;
+  }
+  .gamma-item { font-size: 0.85em; }
+  .gamma-item span { color: #f78166; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Transmission Line Bounce Diagram</h1>
+<p class="subtitle">Visualize voltage wave reflections propagating along a transmission line</p>
+
+<div class="schematic">
+  <div class="sch-block">
+    Vs<br><span class="val-label" id="schVs">1.0 V</span>
+  </div>
+  <div class="sch-block">
+    ─[<span class="val-label" id="schZs">Zs</span>]─
+  </div>
+  <div class="sch-line"></div>
+  <div class="sch-block">
+    ── Transmission Line ──<br>
+    <span class="val-label" id="schZ0">Z₀ = 50 Ω</span>,
+    <span class="val-label" id="schTd">Td = 1 ns</span>
+  </div>
+  <div class="sch-line"></div>
+  <div class="sch-block">
+    ─[<span class="val-label" id="schZL">ZL</span>]─
+  </div>
+</div>
+
+<div class="gamma-display">
+  <div class="gamma-item">Γ<sub>L</sub> = <span id="gammaL">0.33</span></div>
+  <div class="gamma-item">Γ<sub>S</sub> = <span id="gammaS">0.33</span></div>
+  <div class="gamma-item">V<sub>∞</sub> = <span id="vInf">0.50 V</span></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f97583"></div> Forward wave (→)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#79c0ff"></div> Reflected wave (←)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div> Total voltage</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7ee787"></div> Steady state V∞</div>
+</div>
+
+<div class="top-row">
+  <div class="panel">
+    <h2>Lattice (Bounce) Diagram</h2>
+    <canvas id="latticeCanvas" width="480" height="460"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Voltage vs Position (snapshot)</h2>
+    <canvas id="spatialCanvas" width="480" height="200"></canvas>
+    <h2 style="margin-top:10px;">Voltage vs Time</h2>
+    <canvas id="timeCanvas" width="480" height="220"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Z₀ (Ω):</label>
+    <input type="range" id="z0Slider" min="10" max="200" step="5" value="50">
+    <span class="val" id="z0Val">50</span>
+  </div>
+  <div class="control-group">
+    <label>Zs (Ω):</label>
+    <input type="range" id="zsSlider" min="0" max="300" step="5" value="100">
+    <span class="val" id="zsVal">100</span>
+  </div>
+  <div class="control-group">
+    <label>ZL (Ω):</label>
+    <input type="range" id="zlSlider" min="0" max="500" step="5" value="100">
+    <span class="val" id="zlVal">100</span>
+  </div>
+  <div class="control-group">
+    <label>Vs (V):</label>
+    <input type="range" id="vsSlider" min="0.5" max="5" step="0.1" value="1">
+    <span class="val" id="vsVal">1.0</span>
+  </div>
+  <div class="control-group">
+    <label>Preset:</label>
+    <select id="presetSelect">
+      <option value="">Custom</option>
+      <option value="matched">Matched (Zs=Z₀=ZL)</option>
+      <option value="open">Open load (ZL=∞)</option>
+      <option value="short">Short load (ZL=0)</option>
+      <option value="cap">Capacitive-like (ZL&lt;Z₀)</option>
+      <option value="ringing">Ringing (Zs≫Z₀≪ZL)</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Speed:</label>
+    <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="0.8">
+    <span class="val" id="speedVal">0.8x</span>
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="stepBtn" class="sec">Step</button>
+  <button id="resetBtn" class="warn">Reset</button>
+</div>
+
+<div class="info">
+  <strong>Bounce Diagram:</strong>
+  When a step voltage is applied, the initial wave <code>V⁺ = Vs · Z₀/(Zs+Z₀)</code> travels forward.
+  At each end, it reflects with coefficient
+  <code>Γ_L = (ZL−Z₀)/(ZL+Z₀)</code> and <code>Γ_S = (Zs−Z₀)/(Zs+Z₀)</code>.
+  Each bounce multiplies the wave by the reflection coefficient. The total voltage converges to
+  <code>V∞ = Vs · ZL/(Zs+ZL)</code> — the DC steady-state from the resistive divider.
+  <br><br>
+  Try the <strong>presets</strong>: matched (no reflections), open/short (full +/− reflection), or ringing (slow convergence).
+  <br><br>
+  <a href="index.html">← 3-Phase AC Demo</a> · <a href="mutual-inductance.html">Mutual Inductance Demo</a>
+</div>
+
+<script>
+const latticeC = document.getElementById('latticeCanvas');
+const spatialC = document.getElementById('spatialCanvas');
+const timeC    = document.getElementById('timeCanvas');
+const lCtx = latticeC.getContext('2d');
+const sCtx = spatialC.getContext('2d');
+const tCtx = timeC.getContext('2d');
+
+const z0Slider = document.getElementById('z0Slider');
+const zsSlider = document.getElementById('zsSlider');
+const zlSlider = document.getElementById('zlSlider');
+const vsSlider = document.getElementById('vsSlider');
+const speedSlider = document.getElementById('speedSlider');
+const presetSelect = document.getElementById('presetSelect');
+
+let time = 0, paused = false, lastTs = 0;
+const MAX_BOUNCES = 14;
+const Td = 1; // one-way delay normalized to 1
+
+// -- Presets --
+presetSelect.onchange = () => {
+  const p = presetSelect.value;
+  if (p === 'matched')  { z0Slider.value=50; zsSlider.value=50;  zlSlider.value=50;  }
+  if (p === 'open')     { z0Slider.value=50; zsSlider.value=50;  zlSlider.value=500; }
+  if (p === 'short')    { z0Slider.value=50; zsSlider.value=50;  zlSlider.value=0;   }
+  if (p === 'cap')      { z0Slider.value=50; zsSlider.value=50;  zlSlider.value=25;  }
+  if (p === 'ringing')  { z0Slider.value=50; zsSlider.value=200; zlSlider.value=200; }
+  updateSliderDisplays();
+  resetSim();
+};
+
+function updateSliderDisplays() {
+  document.getElementById('z0Val').textContent = z0Slider.value;
+  document.getElementById('zsVal').textContent = zsSlider.value;
+  document.getElementById('zlVal').textContent = zlSlider.value;
+  document.getElementById('vsVal').textContent = parseFloat(vsSlider.value).toFixed(1);
+  document.getElementById('speedVal').textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+}
+[z0Slider, zsSlider, zlSlider, vsSlider, speedSlider].forEach(s => s.oninput = () => {
+  updateSliderDisplays();
+  presetSelect.value = '';
+  resetSim();
+});
+
+document.getElementById('pauseBtn').onclick = function() {
+  paused = !paused;
+  this.textContent = paused ? 'Play' : 'Pause';
+};
+document.getElementById('stepBtn').onclick = () => {
+  paused = true;
+  document.getElementById('pauseBtn').textContent = 'Play';
+  time += Td * 0.5;
+};
+document.getElementById('resetBtn').onclick = resetSim;
+
+function resetSim() {
+  time = 0;
+  paused = false;
+  document.getElementById('pauseBtn').textContent = 'Pause';
+}
+
+// -- Physics --
+function getParams() {
+  const Z0 = parseFloat(z0Slider.value);
+  const Zs = parseFloat(zsSlider.value);
+  const ZL = parseFloat(zlSlider.value);
+  const Vs = parseFloat(vsSlider.value);
+
+  const gammaL = ZL >= 9999 ? 1 : (ZL - Z0) / (ZL + Z0);
+  const gammaS = (Zs - Z0) / (Zs + Z0);
+  const V0 = Vs * Z0 / (Zs + Z0); // initial forward wave
+  const Vinf = ZL >= 9999 ? Vs : Vs * ZL / (Zs + ZL);
+
+  return { Z0, Zs, ZL, Vs, gammaL, gammaS, V0, Vinf };
+}
+
+function computeBounces(params) {
+  const { gammaL, gammaS, V0 } = params;
+  // Each bounce: { amplitude, startTime, fromSource (bool) }
+  const bounces = [];
+  let amp = V0;
+  let t = 0;
+  for (let i = 0; i < MAX_BOUNCES; i++) {
+    const fromSource = (i % 2 === 0);
+    bounces.push({ amp, startTime: t, fromSource });
+    t += Td;
+    // reflect
+    amp *= fromSource ? gammaL : gammaS;
+    if (Math.abs(amp) < 1e-6) break;
+  }
+  return bounces;
+}
+
+// Voltage at position x (0=source, 1=load) at time t
+function voltageAt(x, t, bounces) {
+  let v = 0;
+  for (const b of bounces) {
+    let arrival;
+    if (b.fromSource) {
+      // travels from source (x=0) to load (x=1)
+      arrival = b.startTime + x * Td;
+    } else {
+      // travels from load (x=1) to source (x=0)
+      arrival = b.startTime + (1 - x) * Td;
+    }
+    if (t >= arrival) {
+      v += b.amp;
+    }
+  }
+  return v;
+}
+
+// -- Drawing --
+function drawLattice(bounces, params) {
+  const W = latticeC.width, H = latticeC.height;
+  const pad = { l: 55, r: 55, t: 30, b: 30 };
+  const pW = W - pad.l - pad.r;
+  const pH = H - pad.t - pad.b;
+  const maxT = (MAX_BOUNCES + 1) * Td;
+
+  lCtx.clearRect(0, 0, W, H);
+
+  // Grid
+  lCtx.strokeStyle = '#ffffff08';
+  lCtx.lineWidth = 1;
+  for (let i = 0; i <= MAX_BOUNCES + 1; i++) {
+    const y = pad.t + (i * Td / maxT) * pH;
+    lCtx.beginPath(); lCtx.moveTo(pad.l, y); lCtx.lineTo(pad.l + pW, y); lCtx.stroke();
+  }
+
+  // Source & Load vertical lines
+  lCtx.strokeStyle = '#30363d';
+  lCtx.lineWidth = 2;
+  lCtx.beginPath(); lCtx.moveTo(pad.l, pad.t); lCtx.lineTo(pad.l, pad.t + pH); lCtx.stroke();
+  lCtx.beginPath(); lCtx.moveTo(pad.l + pW, pad.t); lCtx.lineTo(pad.l + pW, pad.t + pH); lCtx.stroke();
+
+  // Labels
+  lCtx.fillStyle = '#8b949e';
+  lCtx.font = '11px sans-serif';
+  lCtx.textAlign = 'center';
+  lCtx.fillText('Source (x=0)', pad.l, pad.t - 10);
+  lCtx.fillText('Load (x=L)', pad.l + pW, pad.t - 10);
+  lCtx.textAlign = 'right';
+  lCtx.fillText('t', pad.l - 8, pad.t - 10);
+
+  // Time axis labels
+  for (let i = 0; i <= MAX_BOUNCES + 1; i++) {
+    const y = pad.t + (i * Td / maxT) * pH;
+    lCtx.fillStyle = '#484f58';
+    lCtx.font = '10px sans-serif';
+    lCtx.textAlign = 'right';
+    lCtx.fillText(i + 'T', pad.l - 6, y + 3);
+  }
+
+  // Time cursor
+  const cursorY = pad.t + (Math.min(time, maxT) / maxT) * pH;
+  lCtx.strokeStyle = '#ffa65740';
+  lCtx.lineWidth = 1;
+  lCtx.setLineDash([4, 4]);
+  lCtx.beginPath(); lCtx.moveTo(pad.l, cursorY); lCtx.lineTo(pad.l + pW, cursorY); lCtx.stroke();
+  lCtx.setLineDash([]);
+  lCtx.fillStyle = '#ffa657';
+  lCtx.font = 'bold 10px sans-serif';
+  lCtx.textAlign = 'right';
+  lCtx.fillText('t=' + time.toFixed(1) + 'T', pad.l - 4, cursorY + 3);
+
+  // Draw bounce arrows
+  bounces.forEach((b, i) => {
+    const y1 = pad.t + (b.startTime / maxT) * pH;
+    const y2 = pad.t + ((b.startTime + Td) / maxT) * pH;
+    const x1 = b.fromSource ? pad.l : pad.l + pW;
+    const x2 = b.fromSource ? pad.l + pW : pad.l;
+
+    // Determine how far the wave has traveled
+    const elapsed = time - b.startTime;
+    const progress = Math.max(0, Math.min(1, elapsed / Td));
+
+    if (progress <= 0) return;
+
+    const color = b.fromSource ? '#f97583' : '#79c0ff';
+    const dimColor = b.fromSource ? '#f9758340' : '#79c0ff40';
+
+    // Full path (dimmed)
+    lCtx.strokeStyle = dimColor;
+    lCtx.lineWidth = 1;
+    lCtx.beginPath(); lCtx.moveTo(x1, y1); lCtx.lineTo(x2, y2); lCtx.stroke();
+
+    // Animated portion
+    const ex = x1 + (x2 - x1) * progress;
+    const ey = y1 + (y2 - y1) * progress;
+    lCtx.strokeStyle = color;
+    lCtx.lineWidth = 2.5;
+    lCtx.shadowColor = color;
+    lCtx.shadowBlur = 6;
+    lCtx.beginPath(); lCtx.moveTo(x1, y1); lCtx.lineTo(ex, ey); lCtx.stroke();
+    lCtx.shadowBlur = 0;
+
+    // Wavefront dot
+    if (progress < 1) {
+      lCtx.beginPath();
+      lCtx.arc(ex, ey, 4, 0, Math.PI * 2);
+      lCtx.fillStyle = color;
+      lCtx.fill();
+    }
+
+    // Amplitude label at midpoint
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const labelAmp = b.amp;
+    lCtx.fillStyle = color;
+    lCtx.font = 'bold 10px sans-serif';
+    lCtx.textAlign = b.fromSource ? 'right' : 'left';
+    const labelOffset = b.fromSource ? -8 : 8;
+    lCtx.fillText((labelAmp >= 0 ? '+' : '') + labelAmp.toFixed(3) + ' V', mx + labelOffset, my - 4);
+
+    // Reflection coefficient at endpoints
+    if (progress >= 1 && i < bounces.length - 1) {
+      const nextB = bounces[i + 1];
+      const gam = b.fromSource ? params.gammaL : params.gammaS;
+      const label = b.fromSource ? 'Γ_L' : 'Γ_S';
+      lCtx.fillStyle = '#d2a8ff';
+      lCtx.font = '9px sans-serif';
+      lCtx.textAlign = b.fromSource ? 'left' : 'right';
+      const gx = b.fromSource ? pad.l + pW + 4 : pad.l - 4;
+      lCtx.fillText(label + '=' + gam.toFixed(2), gx, y2 + 3);
+    }
+  });
+}
+
+function drawSpatial(bounces, params) {
+  const W = spatialC.width, H = spatialC.height;
+  const pad = { l: 50, r: 20, t: 20, b: 30 };
+  const pW = W - pad.l - pad.r;
+  const pH = H - pad.t - pad.b;
+
+  sCtx.clearRect(0, 0, W, H);
+
+  // Determine voltage range
+  const Vs = params.Vs;
+  const maxV = Math.max(Vs * 1.5, Math.abs(params.Vinf) * 1.5, 1);
+  const minV = -maxV * 0.5;
+  const range = maxV - minV;
+
+  // Grid
+  sCtx.strokeStyle = '#ffffff08';
+  sCtx.lineWidth = 1;
+  for (let v = Math.ceil(minV * 4) / 4; v <= maxV; v += 0.25) {
+    const y = pad.t + pH - ((v - minV) / range) * pH;
+    sCtx.beginPath(); sCtx.moveTo(pad.l, y); sCtx.lineTo(pad.l + pW, y); sCtx.stroke();
+  }
+
+  // Zero line
+  const zeroY = pad.t + pH - ((0 - minV) / range) * pH;
+  sCtx.strokeStyle = '#ffffff20';
+  sCtx.lineWidth = 1;
+  sCtx.beginPath(); sCtx.moveTo(pad.l, zeroY); sCtx.lineTo(pad.l + pW, zeroY); sCtx.stroke();
+
+  // Steady state line
+  const ssY = pad.t + pH - ((params.Vinf - minV) / range) * pH;
+  sCtx.strokeStyle = '#7ee78740';
+  sCtx.lineWidth = 1;
+  sCtx.setLineDash([6, 4]);
+  sCtx.beginPath(); sCtx.moveTo(pad.l, ssY); sCtx.lineTo(pad.l + pW, ssY); sCtx.stroke();
+  sCtx.setLineDash([]);
+  sCtx.fillStyle = '#7ee787';
+  sCtx.font = '10px sans-serif';
+  sCtx.textAlign = 'left';
+  sCtx.fillText('V∞=' + params.Vinf.toFixed(3), pad.l + pW + 2, ssY + 3);
+
+  // Voltage profile
+  const steps = 200;
+  sCtx.strokeStyle = '#ffa657';
+  sCtx.lineWidth = 2.5;
+  sCtx.shadowColor = '#ffa657';
+  sCtx.shadowBlur = 4;
+  sCtx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const x01 = i / steps;
+    const v = voltageAt(x01, time, bounces);
+    const sx = pad.l + x01 * pW;
+    const sy = pad.t + pH - ((v - minV) / range) * pH;
+    i === 0 ? sCtx.moveTo(sx, sy) : sCtx.lineTo(sx, sy);
+  }
+  sCtx.stroke();
+  sCtx.shadowBlur = 0;
+
+  // Show wavefronts
+  bounces.forEach(b => {
+    const elapsed = time - b.startTime;
+    const progress = elapsed / Td;
+    if (progress < 0 || progress > 1) return;
+    const xPos = b.fromSource ? progress : (1 - progress);
+    const sx = pad.l + xPos * pW;
+    const v = voltageAt(xPos, time, bounces);
+    const sy = pad.t + pH - ((v - minV) / range) * pH;
+
+    const color = b.fromSource ? '#f97583' : '#79c0ff';
+    sCtx.strokeStyle = color + '60';
+    sCtx.lineWidth = 1;
+    sCtx.setLineDash([3, 3]);
+    sCtx.beginPath(); sCtx.moveTo(sx, pad.t); sCtx.lineTo(sx, pad.t + pH); sCtx.stroke();
+    sCtx.setLineDash([]);
+
+    sCtx.beginPath();
+    sCtx.arc(sx, sy, 5, 0, Math.PI * 2);
+    sCtx.fillStyle = color;
+    sCtx.fill();
+  });
+
+  // Axis labels
+  sCtx.fillStyle = '#484f58';
+  sCtx.font = '10px sans-serif';
+  sCtx.textAlign = 'center';
+  sCtx.fillText('Source', pad.l, H - 6);
+  sCtx.fillText('Load', pad.l + pW, H - 6);
+  sCtx.fillText('Position along line', pad.l + pW / 2, H - 6);
+  sCtx.textAlign = 'right';
+  sCtx.fillText('V', pad.l - 6, pad.t + 4);
+}
+
+function drawTimeChart(bounces, params) {
+  const W = timeC.width, H = timeC.height;
+  const pad = { l: 50, r: 20, t: 20, b: 30 };
+  const pW = W - pad.l - pad.r;
+  const pH = H - pad.t - pad.b;
+  const maxTime = (MAX_BOUNCES + 1) * Td;
+
+  tCtx.clearRect(0, 0, W, H);
+
+  const Vs = params.Vs;
+  const maxV = Math.max(Vs * 1.5, Math.abs(params.Vinf) * 1.5, 1);
+  const minV = -maxV * 0.5;
+  const range = maxV - minV;
+
+  // Grid
+  tCtx.strokeStyle = '#ffffff08';
+  tCtx.lineWidth = 1;
+  for (let ti = 0; ti <= maxTime; ti += Td) {
+    const x = pad.l + (ti / maxTime) * pW;
+    tCtx.beginPath(); tCtx.moveTo(x, pad.t); tCtx.lineTo(x, pad.t + pH); tCtx.stroke();
+  }
+
+  // Zero
+  const zeroY = pad.t + pH - ((0 - minV) / range) * pH;
+  tCtx.strokeStyle = '#ffffff20';
+  tCtx.beginPath(); tCtx.moveTo(pad.l, zeroY); tCtx.lineTo(pad.l + pW, zeroY); tCtx.stroke();
+
+  // Steady state
+  const ssY = pad.t + pH - ((params.Vinf - minV) / range) * pH;
+  tCtx.strokeStyle = '#7ee78740';
+  tCtx.setLineDash([6, 4]);
+  tCtx.beginPath(); tCtx.moveTo(pad.l, ssY); tCtx.lineTo(pad.l + pW, ssY); tCtx.stroke();
+  tCtx.setLineDash([]);
+
+  // Time cursor
+  const cursorX = pad.l + (Math.min(time, maxTime) / maxTime) * pW;
+  tCtx.strokeStyle = '#ffa65740';
+  tCtx.lineWidth = 1;
+  tCtx.setLineDash([3, 3]);
+  tCtx.beginPath(); tCtx.moveTo(cursorX, pad.t); tCtx.lineTo(cursorX, pad.t + pH); tCtx.stroke();
+  tCtx.setLineDash([]);
+
+  // Voltage at source (x=0)
+  const steps = 500;
+  const drawTrace = (xPos, color, label) => {
+    tCtx.strokeStyle = color;
+    tCtx.lineWidth = 2;
+    tCtx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const ti = (i / steps) * Math.min(time, maxTime);
+      const v = voltageAt(xPos, ti, bounces);
+      const sx = pad.l + (ti / maxTime) * pW;
+      const sy = pad.t + pH - ((v - minV) / range) * pH;
+      i === 0 ? tCtx.moveTo(sx, sy) : tCtx.lineTo(sx, sy);
+    }
+    tCtx.stroke();
+
+    // Current value dot
+    if (time > 0) {
+      const v = voltageAt(xPos, Math.min(time, maxTime), bounces);
+      const sx = pad.l + (Math.min(time, maxTime) / maxTime) * pW;
+      const sy = pad.t + pH - ((v - minV) / range) * pH;
+      tCtx.beginPath();
+      tCtx.arc(sx, sy, 4, 0, Math.PI * 2);
+      tCtx.fillStyle = color;
+      tCtx.fill();
+      tCtx.fillStyle = color;
+      tCtx.font = 'bold 10px sans-serif';
+      tCtx.textAlign = 'left';
+      tCtx.fillText(label + '=' + v.toFixed(3) + 'V', sx + 8, sy + 3);
+    }
+  };
+
+  drawTrace(0, '#f97583', 'Vs');
+  drawTrace(1, '#79c0ff', 'VL');
+
+  // Labels
+  tCtx.fillStyle = '#484f58';
+  tCtx.font = '10px sans-serif';
+  tCtx.textAlign = 'center';
+  tCtx.fillText('Time (multiples of Td)', pad.l + pW / 2, H - 6);
+  for (let i = 0; i <= MAX_BOUNCES + 1; i += 2) {
+    const x = pad.l + (i * Td / maxTime) * pW;
+    tCtx.fillText(i + 'T', x, pad.t + pH + 14);
+  }
+  tCtx.textAlign = 'right';
+  tCtx.fillText('V', pad.l - 6, pad.t + 4);
+}
+
+function updateDisplay() {
+  const params = getParams();
+  const bounces = computeBounces(params);
+
+  // Update info displays
+  document.getElementById('schVs').textContent = params.Vs.toFixed(1) + ' V';
+  document.getElementById('schZs').textContent = 'Zs=' + params.Zs + 'Ω';
+  document.getElementById('schZ0').textContent = 'Z₀=' + params.Z0 + 'Ω';
+  document.getElementById('schZL').textContent = 'ZL=' + (params.ZL >= 9999 ? '∞' : params.ZL + 'Ω');
+  document.getElementById('gammaL').textContent = params.gammaL.toFixed(3);
+  document.getElementById('gammaS').textContent = params.gammaS.toFixed(3);
+  document.getElementById('vInf').textContent = params.Vinf.toFixed(3) + ' V';
+
+  drawLattice(bounces, params);
+  drawSpatial(bounces, params);
+  drawTimeChart(bounces, params);
+}
+
+function animate(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  if (!paused) {
+    time += dt * parseFloat(speedSlider.value);
+  }
+
+  updateDisplay();
+  requestAnimationFrame(animate);
+}
+
+updateSliderDisplays();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
