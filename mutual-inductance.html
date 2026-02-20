@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mutual Inductance — Energy Transfer Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 { font-size: 1.6em; color: #e0e0ff; }
+  .subtitle { color: #7d8590; margin-bottom: 16px; font-size: 0.95em; }
+  .main-canvas { border-radius: 12px; background: #0d1117; }
+  .panels {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    justify-content: center; margin-top: 16px; max-width: 1100px; width: 100%;
+  }
+  .panel {
+    background: #161b22;
+    border-radius: 12px;
+    padding: 14px;
+    border: 1px solid #30363d;
+    flex: 1; min-width: 280px;
+  }
+  .panel h2 { font-size: 0.95em; color: #8b949e; margin-bottom: 8px; text-align: center; }
+  canvas { display: block; border-radius: 8px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px;
+    justify-content: center; align-items: center;
+  }
+  .control-group { display: flex; align-items: center; gap: 6px; }
+  .control-group label { font-size: 0.82em; color: #8b949e; white-space: nowrap; }
+  input[type="range"] { width: 110px; accent-color: #f78166; }
+  .val { font-size: 0.82em; color: #f78166; min-width: 38px; }
+  button {
+    background: #238636; color: white; border: none;
+    padding: 7px 18px; border-radius: 6px; cursor: pointer;
+    font-size: 0.88em; transition: background 0.2s;
+  }
+  button:hover { background: #2ea043; }
+  button.secondary { background: #30363d; }
+  button.secondary:hover { background: #484f58; }
+  .legend {
+    display: flex; gap: 18px; justify-content: center;
+    margin-top: 10px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.82em; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .info {
+    max-width: 1100px; width: 100%;
+    background: #161b22; border-radius: 12px;
+    padding: 14px 18px; border: 1px solid #30363d;
+    margin-top: 16px; font-size: 0.88em; line-height: 1.6; color: #8b949e;
+  }
+  .info strong { color: #e0e0ff; }
+  a { color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<h1>Mutual Inductance &amp; Energy Transfer</h1>
+<p class="subtitle">Watch energy build up in the primary coil and transfer to the secondary through magnetic coupling</p>
+
+<canvas id="mainCanvas" class="main-canvas" width="1060" height="400"></canvas>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f97583"></div> Primary coil</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#79c0ff"></div> Secondary coil</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d2a8ff"></div> Magnetic flux</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div> Energy flow</div>
+</div>
+
+<div class="panels">
+  <div class="panel">
+    <h2>Voltage &amp; Current</h2>
+    <canvas id="waveCanvas" width="520" height="200"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Energy Distribution</h2>
+    <canvas id="energyCanvas" width="520" height="200"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Coupling (k):</label>
+    <input type="range" id="couplingSlider" min="0" max="1" step="0.01" value="0.85">
+    <span class="val" id="couplingVal">0.85</span>
+  </div>
+  <div class="control-group">
+    <label>Frequency:</label>
+    <input type="range" id="freqSlider" min="0.3" max="3" step="0.1" value="1.0">
+    <span class="val" id="freqVal">1.0 Hz</span>
+  </div>
+  <div class="control-group">
+    <label>Resistance:</label>
+    <input type="range" id="resistSlider" min="0" max="0.5" step="0.01" value="0.08">
+    <span class="val" id="resistVal">0.08</span>
+  </div>
+  <div class="control-group">
+    <label>Drive:</label>
+    <input type="range" id="driveSlider" min="0" max="1" step="0.05" value="0.7">
+    <span class="val" id="driveVal">70%</span>
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="resetBtn" class="secondary">Reset</button>
+</div>
+
+<div class="info">
+  <strong>Mutual Inductance:</strong> When AC current flows through the primary coil, it creates a changing
+  magnetic field. This flux links with the secondary coil and induces a voltage (Faraday's law).
+  The <strong>coupling coefficient k</strong> (0–1) controls how much flux is shared.
+  At k=1, all energy transfers perfectly; at lower values, leakage flux reduces transfer efficiency.
+  Energy oscillates between the magnetic field (inductors) and can be observed flowing back and forth
+  between the two coils — the same principle behind <strong>transformers, wireless charging, and inductive coupling</strong>.
+  <br><br>
+  <a href="index.html">← Back to 3-Phase AC Demo</a>
+</div>
+
+<script>
+const mainCanvas = document.getElementById('mainCanvas');
+const waveCanvas = document.getElementById('waveCanvas');
+const energyCanvas = document.getElementById('energyCanvas');
+const mCtx = mainCanvas.getContext('2d');
+const wCtx = waveCanvas.getContext('2d');
+const eCtx = energyCanvas.getContext('2d');
+
+const couplingSlider = document.getElementById('couplingSlider');
+const freqSlider = document.getElementById('freqSlider');
+const resistSlider = document.getElementById('resistSlider');
+const driveSlider = document.getElementById('driveSlider');
+
+let time = 0, paused = false, lastTs = 0;
+
+// Physics state — simplified coupled oscillator
+let I1 = 0, I2 = 0; // currents
+const L1 = 1, L2 = 1; // inductances (normalized)
+const C1 = 1; // driving capacitance
+
+// History buffers for waveforms
+const HIST = 300;
+let histV1 = new Float32Array(HIST);
+let histV2 = new Float32Array(HIST);
+let histI1 = new Float32Array(HIST);
+let histI2 = new Float32Array(HIST);
+let histE1 = new Float32Array(HIST);
+let histE2 = new Float32Array(HIST);
+let histEm = new Float32Array(HIST);
+let histIdx = 0;
+
+// Slider readouts
+const sliders = [
+  [couplingSlider, 'couplingVal', v => v],
+  [freqSlider, 'freqVal', v => v + ' Hz'],
+  [resistSlider, 'resistVal', v => v],
+  [driveSlider, 'driveVal', v => Math.round(v * 100) + '%'],
+];
+sliders.forEach(([s, id, fmt]) => {
+  s.oninput = () => document.getElementById(id).textContent = fmt(s.value);
+});
+
+document.getElementById('pauseBtn').onclick = function() {
+  paused = !paused;
+  this.textContent = paused ? 'Play' : 'Pause';
+};
+document.getElementById('resetBtn').onclick = () => {
+  time = 0; I1 = 0; I2 = 0;
+  histV1.fill(0); histV2.fill(0);
+  histI1.fill(0); histI2.fill(0);
+  histE1.fill(0); histE2.fill(0); histEm.fill(0);
+  histIdx = 0;
+  paused = false;
+  document.getElementById('pauseBtn').textContent = 'Pause';
+};
+
+/* ---- PARTICLE SYSTEM for energy flow ---- */
+const particles = [];
+function spawnParticle(fromPrimary) {
+  const baseX = fromPrimary ? 340 : 720;
+  const targetX = fromPrimary ? 720 : 340;
+  particles.push({
+    x: baseX, y: 200 + (Math.random() - 0.5) * 60,
+    tx: targetX, ty: 200 + (Math.random() - 0.5) * 60,
+    progress: 0, speed: 0.008 + Math.random() * 0.012,
+    size: 2 + Math.random() * 2,
+    alpha: 0.6 + Math.random() * 0.4,
+  });
+}
+
+/* ---- DRAW COIL ---- */
+function drawCoil(ctx, cx, cy, turns, color, glowIntensity, currentDir) {
+  const coilW = 80, coilH = 140;
+  const turnH = coilH / turns;
+
+  // Glow background
+  const grd = ctx.createRadialGradient(cx, cy, 10, cx, cy, 100);
+  grd.addColorStop(0, color + Math.round(glowIntensity * 40).toString(16).padStart(2, '0'));
+  grd.addColorStop(1, color + '00');
+  ctx.fillStyle = grd;
+  ctx.fillRect(cx - 100, cy - 100, 200, 200);
+
+  // Core
+  ctx.fillStyle = '#30363d';
+  ctx.fillRect(cx - 8, cy - coilH / 2 - 10, 16, coilH + 20);
+
+  // Coil windings
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < turns; i++) {
+    const yOff = cy - coilH / 2 + i * turnH + turnH / 2;
+    const phase = time * 8 + i * 0.5;
+    const bulge = Math.sin(phase) * currentDir * 5;
+
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glowIntensity * 15;
+    ctx.beginPath();
+    ctx.ellipse(cx + bulge, yOff, coilW / 2, turnH * 0.4, 0, 0, Math.PI, false);
+    ctx.stroke();
+    ctx.strokeStyle = color + '80';
+    ctx.beginPath();
+    ctx.ellipse(cx + bulge, yOff, coilW / 2, turnH * 0.4, 0, Math.PI, Math.PI * 2, false);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Current direction arrows
+  if (Math.abs(currentDir) > 0.05) {
+    const arrowY = cy - coilH / 2 - 22;
+    const dir = currentDir > 0 ? 1 : -1;
+    ctx.fillStyle = color;
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(dir > 0 ? '↓ I' : '↑ I', cx, arrowY);
+  }
+}
+
+/* ---- DRAW MAGNETIC FIELD LINES ---- */
+function drawFieldLines(ctx, x1, x2, cy, coupling, intensity) {
+  const midX = (x1 + x2) / 2;
+  const count = 8;
+  const spread = 120;
+
+  for (let i = 0; i < count; i++) {
+    const t = (i / (count - 1)) - 0.5;
+    const yOff = t * spread;
+    const phase = time * 3 + i * 0.8;
+    const wave = Math.sin(phase) * 8 * intensity;
+
+    const alpha = Math.min(1, coupling * intensity * 0.8);
+    if (alpha < 0.02) continue;
+
+    ctx.strokeStyle = `rgba(210,168,255,${alpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(x1 + 50, cy + yOff);
+    ctx.quadraticCurveTo(midX, cy + yOff + wave, x2 - 50, cy + yOff);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrow in middle
+    if (alpha > 0.15) {
+      const ax = midX;
+      const ay = cy + yOff + wave * 0.5;
+      const dir = intensity > 0 ? 1 : -1;
+      ctx.fillStyle = `rgba(210,168,255,${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(ax + 6 * dir, ay);
+      ctx.lineTo(ax - 4 * dir, ay - 4);
+      ctx.lineTo(ax - 4 * dir, ay + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+}
+
+/* ---- MAIN SCENE ---- */
+function drawMainScene() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  mCtx.clearRect(0, 0, W, H);
+
+  const k = parseFloat(couplingSlider.value);
+  const freq = parseFloat(freqSlider.value);
+  const R = parseFloat(resistSlider.value);
+  const drive = parseFloat(driveSlider.value);
+
+  // Driving voltage
+  const V1 = drive * Math.sin(2 * Math.PI * freq * time);
+
+  // Simplified coupled circuit physics (Euler integration)
+  const dt = 0.016;
+  const M = k * Math.sqrt(L1 * L2);
+  const denom = L1 * L2 - M * M;
+  if (Math.abs(denom) > 0.001) {
+    const dI1 = (L2 * (V1 - R * I1) - M * (-R * I2)) / denom;
+    const dI2 = (L1 * (-R * I2) - M * (V1 - R * I1)) / denom;
+    I1 += dI1 * dt;
+    I2 += dI2 * dt;
+  }
+
+  // Clamp for stability
+  I1 = Math.max(-5, Math.min(5, I1));
+  I2 = Math.max(-5, Math.min(5, I2));
+
+  const V2 = M * (L2 * (V1 - R * I1) - M * (-R * I2)) / (Math.abs(denom) > 0.001 ? denom : 0.01);
+
+  // Energy
+  const E1 = 0.5 * L1 * I1 * I1;
+  const E2 = 0.5 * L2 * I2 * I2;
+  const Em = M * I1 * I2;
+
+  // Record history
+  histV1[histIdx % HIST] = V1;
+  histV2[histIdx % HIST] = Math.max(-3, Math.min(3, V2 * 0.3));
+  histI1[histIdx % HIST] = I1;
+  histI2[histIdx % HIST] = I2;
+  histE1[histIdx % HIST] = E1;
+  histE2[histIdx % HIST] = E2;
+  histEm[histIdx % HIST] = Math.abs(Em);
+  histIdx++;
+
+  const coil1X = 340, coil2X = 720, coilY = 210;
+
+  // Background labels
+  mCtx.fillStyle = '#484f58';
+  mCtx.font = '13px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('PRIMARY', coil1X, 50);
+  mCtx.fillText('SECONDARY', coil2X, 50);
+
+  // Draw field lines
+  drawFieldLines(mCtx, coil1X, coil2X, coilY, k, Math.abs(I1) * 0.5);
+
+  // Spawn energy particles
+  const transferRate = Math.abs(k * I1 * I2);
+  if (Math.random() < transferRate * 0.3) {
+    spawnParticle(I1 * I2 > 0 ? true : false);
+  }
+
+  // Update and draw particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.progress += p.speed;
+    if (p.progress >= 1) { particles.splice(i, 1); continue; }
+
+    const t = p.progress;
+    const midY = p.y + (p.ty - p.y) * 0.5 - 40 * Math.sin(Math.PI * t);
+    const x = p.x + (p.tx - p.x) * t;
+    const y = p.y + (midY - p.y) * 2 * t * (t < 0.5 ? 1 : 0) +
+              (t >= 0.5 ? (midY + (p.ty - midY) * (2 * t - 1)) * 1 : 0);
+    // Simplified bezier
+    const bx = (1-t)*(1-t)*p.x + 2*(1-t)*t*(p.x+p.tx)/2 + t*t*p.tx;
+    const by = (1-t)*(1-t)*p.y + 2*(1-t)*t*(coilY - 60 + Math.sin(t*Math.PI)*30) + t*t*p.ty;
+
+    const alpha = p.alpha * Math.sin(Math.PI * t);
+    mCtx.beginPath();
+    mCtx.arc(bx, by, p.size, 0, Math.PI * 2);
+    mCtx.fillStyle = `rgba(255,166,87,${alpha})`;
+    mCtx.shadowColor = '#ffa657';
+    mCtx.shadowBlur = 8;
+    mCtx.fill();
+    mCtx.shadowBlur = 0;
+  }
+
+  // Draw coils
+  drawCoil(mCtx, coil1X, coilY, 6, '#f97583', Math.abs(I1), Math.sign(I1));
+  drawCoil(mCtx, coil2X, coilY, 6, '#79c0ff', Math.abs(I2), Math.sign(I2));
+
+  // Energy bars
+  const barW = 60, barMaxH = 100;
+  const drawBar = (x, y, val, maxVal, color, label) => {
+    const h = Math.min(barMaxH, (val / maxVal) * barMaxH);
+    mCtx.fillStyle = '#21262d';
+    mCtx.fillRect(x - barW/2, y - barMaxH, barW, barMaxH);
+    mCtx.fillStyle = color + '80';
+    mCtx.fillRect(x - barW/2, y - h, barW, h);
+    mCtx.strokeStyle = '#30363d';
+    mCtx.strokeRect(x - barW/2, y - barMaxH, barW, barMaxH);
+    mCtx.fillStyle = '#8b949e';
+    mCtx.font = '11px sans-serif';
+    mCtx.textAlign = 'center';
+    mCtx.fillText(label, x, y + 14);
+    mCtx.fillStyle = color;
+    mCtx.fillText(val.toFixed(2) + ' J', x, y - barMaxH - 6);
+  };
+
+  const maxE = 3;
+  drawBar(140, 370, E1, maxE, '#f97583', 'E₁ (Primary)');
+  drawBar(530, 370, Math.abs(Em), maxE, '#d2a8ff', 'E_mutual');
+  drawBar(920, 370, E2, maxE, '#79c0ff', 'E₂ (Secondary)');
+
+  // Coupling indicator
+  mCtx.fillStyle = '#8b949e';
+  mCtx.font = '12px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText(`k = ${k.toFixed(2)}`, (coil1X + coil2X) / 2, 50);
+
+  // Coupling arc
+  mCtx.strokeStyle = '#d2a8ff40';
+  mCtx.lineWidth = 2;
+  mCtx.beginPath();
+  mCtx.arc((coil1X + coil2X) / 2, coilY, 60, -0.5, 0.5 + Math.PI);
+  mCtx.stroke();
+}
+
+/* ---- WAVEFORM CHART ---- */
+function drawWaveforms() {
+  const W = waveCanvas.width, H = waveCanvas.height;
+  wCtx.clearRect(0, 0, W, H);
+
+  const midY = H / 2;
+  // Grid
+  wCtx.strokeStyle = '#ffffff08';
+  wCtx.lineWidth = 1;
+  for (let y = 20; y < H - 10; y += (H - 30) / 6) {
+    wCtx.beginPath(); wCtx.moveTo(40, y); wCtx.lineTo(W - 10, y); wCtx.stroke();
+  }
+
+  // Zero line
+  wCtx.strokeStyle = '#ffffff20';
+  wCtx.beginPath(); wCtx.moveTo(40, midY); wCtx.lineTo(W - 10, midY); wCtx.stroke();
+
+  // Labels
+  wCtx.fillStyle = '#484f58';
+  wCtx.font = '10px sans-serif';
+  wCtx.textAlign = 'right';
+  wCtx.fillText('+', 35, 25);
+  wCtx.fillText('0', 35, midY + 3);
+  wCtx.fillText('−', 35, H - 12);
+
+  const plotW = W - 50;
+  const scale = (H / 2 - 20);
+
+  const datasets = [
+    { data: histI1, color: '#f97583', label: 'I₁' },
+    { data: histI2, color: '#79c0ff', label: 'I₂' },
+    { data: histV1, color: '#f9758340', label: 'V₁', dash: [4, 4] },
+  ];
+
+  datasets.forEach(({ data, color, label, dash }) => {
+    wCtx.strokeStyle = color;
+    wCtx.lineWidth = dash ? 1.5 : 2;
+    if (dash) wCtx.setLineDash(dash);
+    wCtx.beginPath();
+    for (let i = 0; i < HIST; i++) {
+      const idx = (histIdx - HIST + i + HIST * 2) % HIST;
+      const x = 40 + (i / HIST) * plotW;
+      const y = midY - (data[idx] / 4) * scale;
+      i === 0 ? wCtx.moveTo(x, y) : wCtx.lineTo(x, y);
+    }
+    wCtx.stroke();
+    wCtx.setLineDash([]);
+
+    // Label at end
+    const lastIdx = (histIdx - 1 + HIST) % HIST;
+    const ly = midY - (data[lastIdx] / 4) * scale;
+    wCtx.fillStyle = color;
+    wCtx.font = 'bold 11px sans-serif';
+    wCtx.textAlign = 'left';
+    wCtx.fillText(label, W - 8, Math.max(15, Math.min(H - 5, ly + 4)));
+  });
+}
+
+/* ---- ENERGY CHART ---- */
+function drawEnergy() {
+  const W = energyCanvas.width, H = energyCanvas.height;
+  eCtx.clearRect(0, 0, W, H);
+
+  // Grid
+  eCtx.strokeStyle = '#ffffff08';
+  eCtx.lineWidth = 1;
+  for (let y = 20; y < H - 10; y += (H - 30) / 4) {
+    eCtx.beginPath(); eCtx.moveTo(40, y); eCtx.lineTo(W - 10, y); eCtx.stroke();
+  }
+
+  // Zero line
+  eCtx.strokeStyle = '#ffffff20';
+  eCtx.beginPath(); eCtx.moveTo(40, H - 20); eCtx.lineTo(W - 10, H - 20); eCtx.stroke();
+
+  eCtx.fillStyle = '#484f58';
+  eCtx.font = '10px sans-serif';
+  eCtx.textAlign = 'right';
+  eCtx.fillText('E', 35, 20);
+  eCtx.fillText('0', 35, H - 17);
+
+  const plotW = W - 50;
+  const plotH = H - 40;
+  const maxE = 3;
+
+  // Stacked area chart
+  const datasets = [
+    { data: histE1, color: '#f97583', label: 'E₁' },
+    { data: histE2, color: '#79c0ff', label: 'E₂' },
+    { data: histEm, color: '#d2a8ff', label: 'E_m' },
+  ];
+
+  datasets.forEach(({ data, color, label }, di) => {
+    eCtx.fillStyle = color + '30';
+    eCtx.strokeStyle = color;
+    eCtx.lineWidth = 2;
+
+    eCtx.beginPath();
+    eCtx.moveTo(40, H - 20);
+    for (let i = 0; i < HIST; i++) {
+      const idx = (histIdx - HIST + i + HIST * 2) % HIST;
+      const x = 40 + (i / HIST) * plotW;
+      const y = (H - 20) - (data[idx] / maxE) * plotH;
+      eCtx.lineTo(x, Math.max(15, y));
+    }
+    eCtx.lineTo(40 + plotW, H - 20);
+    eCtx.closePath();
+    eCtx.fill();
+
+    // Line on top
+    eCtx.beginPath();
+    for (let i = 0; i < HIST; i++) {
+      const idx = (histIdx - HIST + i + HIST * 2) % HIST;
+      const x = 40 + (i / HIST) * plotW;
+      const y = (H - 20) - (data[idx] / maxE) * plotH;
+      i === 0 ? eCtx.moveTo(x, Math.max(15, y)) : eCtx.lineTo(x, Math.max(15, y));
+    }
+    eCtx.stroke();
+
+    // Label
+    const lastIdx = (histIdx - 1 + HIST) % HIST;
+    const ly = (H - 20) - (data[lastIdx] / maxE) * plotH;
+    eCtx.fillStyle = color;
+    eCtx.font = 'bold 11px sans-serif';
+    eCtx.textAlign = 'left';
+    eCtx.fillText(label, W - 8, Math.max(15, Math.min(H - 5, ly + 4)));
+  });
+
+  // Total energy line
+  eCtx.strokeStyle = '#ffa65780';
+  eCtx.lineWidth = 1;
+  eCtx.setLineDash([3, 3]);
+  eCtx.beginPath();
+  for (let i = 0; i < HIST; i++) {
+    const idx = (histIdx - HIST + i + HIST * 2) % HIST;
+    const x = 40 + (i / HIST) * plotW;
+    const total = histE1[idx] + histE2[idx] + histEm[idx];
+    const y = (H - 20) - (total / maxE) * plotH;
+    i === 0 ? eCtx.moveTo(x, Math.max(15, y)) : eCtx.lineTo(x, Math.max(15, y));
+  }
+  eCtx.stroke();
+  eCtx.setLineDash([]);
+}
+
+/* ---- ANIMATION LOOP ---- */
+function animate(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  if (!paused) {
+    time += dt;
+    drawMainScene();
+    drawWaveforms();
+    drawEnergy();
+  }
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
