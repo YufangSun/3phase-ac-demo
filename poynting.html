@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poynting Theorem — Energy Flow in EM Fields</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+  h1{font-size:1.6em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.95em;text-align:center;max-width:800px}
+  canvas{display:block;border-radius:10px}
+  .tabs{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap;justify-content:center}
+  .tab{padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85em;
+    background:#161b22;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .tab:hover{border-color:#58a6ff;color:#e6edf3}
+  .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+  .eq-box{background:#161b22;border:1px solid #30363d;border-radius:10px;
+    padding:10px 16px;margin:8px 0;max-width:960px;width:100%;text-align:center}
+  .eq{font-size:1.15em;font-family:'Times New Roman',serif;color:#e0e0ff;letter-spacing:.5px}
+  .eq-name{font-size:.82em;color:#8b949e;margin-top:2px}
+  .eq-desc{font-size:.8em;color:#7d8590;margin-top:4px;line-height:1.5}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;justify-content:center;align-items:center}
+  .cg{display:flex;align-items:center;gap:5px}
+  .cg label{font-size:.8em;color:#8b949e;white-space:nowrap}
+  input[type="range"]{width:100px;accent-color:#f78166}
+  .val{font-size:.8em;color:#f78166;min-width:36px}
+  button{background:#238636;color:white;border:none;padding:6px 16px;border-radius:6px;
+    cursor:pointer;font-size:.85em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d}
+  button.sec:hover{background:#484f58}
+  .legend{display:flex;gap:14px;justify-content:center;margin:6px 0;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:4px;font-size:.78em}
+  .legend-dot{width:9px;height:9px;border-radius:50%}
+  .row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:10px;max-width:1100px;width:100%}
+  .panel{background:#161b22;border-radius:12px;padding:14px;border:1px solid #30363d;flex:1;min-width:260px}
+  .panel h2{font-size:.9em;color:#8b949e;margin-bottom:6px;text-align:center}
+  .info{max-width:1100px;width:100%;background:#161b22;border-radius:12px;
+    padding:14px 18px;border:1px solid #30363d;margin-top:14px;font-size:.85em;line-height:1.6;color:#8b949e}
+  .info strong{color:#e0e0ff}
+  .info code{color:#f78166;background:#21262d;padding:1px 4px;border-radius:3px}
+  a{color:#58a6ff}
+  .meters{display:flex;gap:12px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+  .meter{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:5px 12px;text-align:center;min-width:120px}
+  .meter .ml{font-size:.7em;color:#8b949e}
+  .meter .mv{font-size:.95em;font-weight:bold;font-family:'Courier New',monospace}
+</style>
+</head>
+<body>
+
+<h1>Poynting Theorem</h1>
+<p class="subtitle">Energy doesn't flow through wires — it flows through the electromagnetic fields surrounding them. The Poynting vector <b style="color:#ffa657">S = E × B / μ₀</b> shows exactly where and how.</p>
+
+<div class="tabs">
+  <div class="tab active" data-tab="0">Resistor (DC)</div>
+  <div class="tab" data-tab="1">EM Wave</div>
+  <div class="tab" data-tab="2">Charging Capacitor</div>
+  <div class="tab" data-tab="3">Coaxial Cable</div>
+</div>
+
+<div id="eqBox" class="eq-box">
+  <div class="eq" id="eqText"></div>
+  <div class="eq-name" id="eqName"></div>
+  <div class="eq-desc" id="eqDesc"></div>
+</div>
+
+<canvas id="mainCanvas" width="1060" height="500"></canvas>
+
+<div id="legendBox" class="legend"></div>
+<div id="meterBox" class="meters"></div>
+<div id="ctrlBox" class="controls"></div>
+
+<div class="row">
+  <div class="panel">
+    <h2 id="ch1Title">Energy Flow</h2>
+    <canvas id="chart1" width="520" height="180"></canvas>
+  </div>
+  <div class="panel">
+    <h2 id="ch2Title">Energy Density</h2>
+    <canvas id="chart2" width="520" height="180"></canvas>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Poynting's Theorem (energy conservation for EM fields):</strong><br>
+  <code>−∂u/∂t = ∇·S + J·E</code><br>
+  The rate of decrease in stored EM energy density <code>u = ½ε₀E² + ½B²/μ₀</code>
+  equals the energy flowing out (divergence of <strong>S</strong>) plus work done on charges (<strong>J·E</strong>).
+  Remarkably, even for a simple DC circuit, energy flows from the battery through the fields
+  <em>outside</em> the wires and converges radially into the resistor where it is dissipated as heat.
+  <br><br>
+  <a href="index.html">← 3-Phase AC</a> ·
+  <a href="mutual-inductance.html">Mutual Inductance</a> ·
+  <a href="transformer.html">Transformer</a> ·
+  <a href="maxwell.html">Maxwell's Equations</a>
+</div>
+
+<script>
+const mainC=document.getElementById('mainCanvas');
+const c1C=document.getElementById('chart1');
+const c2C=document.getElementById('chart2');
+const mCtx=mainC.getContext('2d');
+const c1Ctx=c1C.getContext('2d');
+const c2Ctx=c2C.getContext('2d');
+
+let currentTab=0, time=0, paused=false, lastTs=0;
+let ctrls={};
+
+const tabData=[
+  { eq:'-∂u/∂t = ∇·S + J·E',
+    name:'Energy flow into a resistor',
+    desc:'E field is axial (along wire), B field is circumferential (Ampère). S = E×B points radially inward — energy flows from the fields INTO the resistor, where J·E converts it to heat.',
+    legend:[['#f97583','E field (axial)'],['#79c0ff','B field (circumferential)'],['#ffa657','S = E×B (radial inward)'],['#7ee787','Power dissipated (J·E)']],
+    controls:[
+      {id:'voltage',label:'Voltage V',min:1,max:20,step:0.5,val:10,fmt:v=>v+' V'},
+      {id:'resist',label:'Resistance R',min:1,max:20,step:0.5,val:5,fmt:v=>v+' Ω'},
+      {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'},
+    ],
+    meters:[
+      {id:'mV',label:'Voltage',color:'#f97583'},
+      {id:'mI',label:'Current I=V/R',color:'#79c0ff'},
+      {id:'mP',label:'P = V²/R',color:'#7ee787'},
+      {id:'mS',label:'|S| at surface',color:'#ffa657'},
+    ]},
+  { eq:'S = (1/μ₀) E × B = (E₀²/2μ₀c) ẑ',
+    name:'EM wave energy transport',
+    desc:'In a plane wave, E⊥B⊥propagation. The Poynting vector S = E×B/μ₀ points in the wave direction. Energy density oscillates between E and B, but the time-averaged power flow is constant.',
+    legend:[['#f97583','E field'],['#79c0ff','B field'],['#ffa657','S (Poynting vector)'],['#d2a8ff','Energy density u']],
+    controls:[
+      {id:'amp',label:'E₀ amplitude',min:0.2,max:1,step:0.05,val:0.8,fmt:v=>(v*100|0)+'%'},
+      {id:'freq',label:'Frequency',min:0.3,max:3,step:0.1,val:1.2,fmt:v=>v+' Hz'},
+      {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'},
+    ],
+    meters:[
+      {id:'mE',label:'E(t)',color:'#f97583'},
+      {id:'mB',label:'B(t)',color:'#79c0ff'},
+      {id:'mS',label:'S(t) inst.',color:'#ffa657'},
+      {id:'mSavg',label:'⟨S⟩ avg',color:'#7ee787'},
+    ]},
+  { eq:'S = (1/μ₀) E × B (pointing inward)',
+    name:'Charging capacitor — energy flows into the gap',
+    desc:'As current charges the plates, E builds up in the gap. B circles inside (displacement current!). S = E×B points radially inward through the gap edges — field energy is being stored between the plates.',
+    legend:[['#f97583','E field (between plates)'],['#79c0ff','B field (circular, displacement current)'],['#ffa657','S (inward)'],['#7ee787','Stored energy U = ½CV²']],
+    controls:[
+      {id:'current',label:'Charging current',min:0.5,max:5,step:0.1,val:2,fmt:v=>v+' A'},
+      {id:'capSize',label:'Plate size',min:60,max:150,step:5,val:100,fmt:v=>v+'px'},
+      {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'},
+    ],
+    meters:[
+      {id:'mE',label:'E (gap)',color:'#f97583'},
+      {id:'mQ',label:'Charge Q',color:'#79c0ff'},
+      {id:'mU',label:'Energy ½CV²',color:'#7ee787'},
+      {id:'mS',label:'|S| at edge',color:'#ffa657'},
+    ]},
+  { eq:'S = (1/μ₀) E × B (along cable axis)',
+    name:'Coaxial cable — energy travels in the dielectric',
+    desc:'E is radial (between conductors), B is circumferential (from current). S = E×B points axially down the cable — the energy travels through the insulating dielectric, NOT through the copper!',
+    legend:[['#f97583','E field (radial)'],['#79c0ff','B field (circumferential)'],['#ffa657','S (axial, in dielectric)'],['#7ee787','Power = V·I']],
+    controls:[
+      {id:'voltage',label:'Voltage',min:1,max:20,step:0.5,val:10,fmt:v=>v+' V'},
+      {id:'current',label:'Current',min:0.5,max:5,step:0.1,val:2,fmt:v=>v+' A'},
+      {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'},
+    ],
+    meters:[
+      {id:'mV',label:'Voltage',color:'#f97583'},
+      {id:'mI',label:'Current',color:'#79c0ff'},
+      {id:'mP',label:'P = V·I',color:'#7ee787'},
+      {id:'mS',label:'∫S·dA',color:'#ffa657'},
+    ]},
+];
+
+function buildUI(idx){
+  const d=tabData[idx];
+  document.getElementById('eqText').innerHTML=d.eq;
+  document.getElementById('eqName').textContent=d.name;
+  document.getElementById('eqDesc').textContent=d.desc;
+  const lb=document.getElementById('legendBox');
+  lb.innerHTML='';
+  d.legend.forEach(([c,l])=>{lb.innerHTML+=`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div> ${l}</div>`;});
+
+  const mb=document.getElementById('meterBox');
+  mb.innerHTML='';
+  d.meters.forEach(m=>{mb.innerHTML+=`<div class="meter"><div class="ml">${m.label}</div><div class="mv" id="${m.id}" style="color:${m.color}">—</div></div>`;});
+
+  const cb=document.getElementById('ctrlBox');
+  cb.innerHTML='';ctrls={};
+  d.controls.forEach(c=>{
+    const div=document.createElement('div');div.className='cg';
+    const lbl=document.createElement('label');lbl.textContent=c.label+':';
+    const inp=document.createElement('input');inp.type='range';inp.min=c.min;inp.max=c.max;inp.step=c.step;inp.value=c.val;
+    const sp=document.createElement('span');sp.className='val';sp.textContent=c.fmt(c.val);
+    inp.oninput=()=>sp.textContent=c.fmt(inp.value);
+    div.append(lbl,inp,sp);cb.appendChild(div);ctrls[c.id]=inp;
+  });
+  const pb=document.createElement('button');pb.textContent=paused?'Play':'Pause';
+  pb.onclick=()=>{paused=!paused;pb.textContent=paused?'Play':'Pause';};
+  const rb=document.createElement('button');rb.className='sec';rb.textContent='Reset';
+  rb.onclick=()=>{time=0;paused=false;pb.textContent='Pause';};
+  cb.append(pb,rb);
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    currentTab=parseInt(t.dataset.tab);time=0;
+    document.querySelectorAll('.tab').forEach((x,i)=>x.classList.toggle('active',i===currentTab));
+    buildUI(currentTab);
+  };
+});
+
+function cv(id){return parseFloat(ctrls[id]?.value||0);}
+function setM(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+
+/* ===== DRAWING HELPERS ===== */
+function arrow(ctx,x0,y0,x1,y1,color,headLen){
+  headLen=headLen||8;
+  const dx=x1-x0,dy=y1-y0,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2)return;
+  const ux=dx/len,uy=dy/len;
+  ctx.strokeStyle=color;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+  ctx.fillStyle=color;ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-ux*headLen+uy*headLen*0.4, y1-uy*headLen-ux*headLen*0.4);
+  ctx.lineTo(x1-ux*headLen-uy*headLen*0.4, y1-uy*headLen+ux*headLen*0.4);
+  ctx.closePath();ctx.fill();
+}
+
+function drawGrid(ctx,W,H,pad){
+  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){const y=pad.t+(i/5)*(H-pad.t-pad.b);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
+  const midY=pad.t+(H-pad.t-pad.b)/2;
+  ctx.strokeStyle='#ffffff20';
+  ctx.beginPath();ctx.moveTo(pad.l,midY);ctx.lineTo(W-pad.r,midY);ctx.stroke();
+}
+
+/* ===== TAB 0: RESISTOR ===== */
+function drawResistor(){
+  const W=mainC.width,H=mainC.height,cx=W/2,cy=H/2;
+  mCtx.clearRect(0,0,W,H);
+  const V=cv('voltage'),R=cv('resist'),spd=cv('speed');
+  const I=V/R, P=V*V/R;
+
+  // Wire + resistor layout
+  const rW=140,rH=60;
+  const rX=cx-rW/2,rY=cy-rH/2;
+
+  // Wires
+  const wireColor='#8b949e';
+  mCtx.strokeStyle=wireColor;mCtx.lineWidth=4;
+  mCtx.beginPath();mCtx.moveTo(100,cy);mCtx.lineTo(rX,cy);mCtx.stroke();
+  mCtx.beginPath();mCtx.moveTo(rX+rW,cy);mCtx.lineTo(W-100,cy);mCtx.stroke();
+
+  // Battery symbol
+  mCtx.strokeStyle='#7ee787';mCtx.lineWidth=3;
+  mCtx.beginPath();mCtx.moveTo(60,cy-25);mCtx.lineTo(60,cy+25);mCtx.stroke();
+  mCtx.lineWidth=5;
+  mCtx.beginPath();mCtx.moveTo(80,cy-15);mCtx.lineTo(80,cy+15);mCtx.stroke();
+  mCtx.strokeStyle=wireColor;mCtx.lineWidth=4;
+  mCtx.beginPath();mCtx.moveTo(60,cy);mCtx.lineTo(30,cy);mCtx.lineTo(30,cy-120);
+  mCtx.lineTo(W-30,cy-120);mCtx.lineTo(W-30,cy);mCtx.lineTo(W-100,cy);mCtx.stroke();
+  mCtx.beginPath();mCtx.moveTo(80,cy);mCtx.lineTo(100,cy);mCtx.stroke();
+
+  // Return wire
+  mCtx.beginPath();mCtx.moveTo(30,cy);mCtx.lineTo(30,cy+120);
+  mCtx.lineTo(W-30,cy+120);mCtx.lineTo(W-30,cy);mCtx.stroke();
+
+  // Current dots
+  const dotSpd=time*spd*60*I/3;
+  const path=[[100,cy],[rX,cy],[rX+rW,cy],[W-100,cy],[W-30,cy],[W-30,cy-120],
+    [30,cy-120],[30,cy],[60,cy]];
+  // simplified: dots along top wire and bottom return
+  mCtx.fillStyle='#ffcc00';
+  for(let d=0;d<10;d++){
+    // Top: left to right
+    const t1=((dotSpd+d*80)%800+800)%800;
+    if(t1<W-200){const x=100+t1;mCtx.beginPath();mCtx.arc(Math.min(x,W-100),cy,3,0,Math.PI*2);mCtx.fill();}
+    // Top return: right to left at y-120
+    const t2=((dotSpd+d*80+400)%800+800)%800;
+    if(t2<W-60){const x=W-30-t2;mCtx.beginPath();mCtx.arc(Math.max(30,x),cy-120,3,0,Math.PI*2);mCtx.fill();}
+  }
+
+  // Resistor body
+  mCtx.fillStyle='#21262d';mCtx.strokeStyle='#484f58';mCtx.lineWidth=2;
+  mCtx.beginPath();mCtx.roundRect(rX,rY,rW,rH,8);mCtx.fill();mCtx.stroke();
+
+  // Heat glow
+  const glow=Math.min(1,P/30);
+  if(glow>0.02){
+    const g=mCtx.createRadialGradient(cx,cy,10,cx,cy,120);
+    g.addColorStop(0,`rgba(126,231,135,${glow*0.2})`);
+    g.addColorStop(1,'rgba(126,231,135,0)');
+    mCtx.fillStyle=g;mCtx.fillRect(cx-120,cy-120,240,240);
+  }
+
+  // Resistor label
+  mCtx.fillStyle='#e6edf3';mCtx.font='bold 14px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('R = '+R+' Ω',cx,cy+5);
+  mCtx.fillStyle='#7ee787';mCtx.font='11px sans-serif';
+  mCtx.fillText('P = J·E = '+P.toFixed(1)+' W (heat)',cx,cy+22);
+
+  // E field arrows (axial, along wire direction inside resistor)
+  const eScale=Math.min(40,V*3);
+  for(let gy=cy-20;gy<=cy+20;gy+=20){
+    arrow(mCtx,rX+10,gy,rX+10+eScale,gy,'#f97583',7);
+  }
+  mCtx.fillStyle='#f97583';mCtx.font='bold 11px sans-serif';mCtx.textAlign='left';
+  mCtx.fillText('E (axial)',rX+rW+10,cy-30);
+
+  // B field (circles around wire — shown as dots/crosses above/below)
+  const bR=60;
+  const bAlpha=Math.min(0.7,I*0.25);
+  // Above wire: B into page (cross)
+  for(let x=rX-30;x<=rX+rW+30;x+=30){
+    const sz=Math.min(5,I*3);
+    // Above
+    mCtx.strokeStyle=`rgba(121,192,255,${bAlpha})`;mCtx.lineWidth=1.5;
+    mCtx.beginPath();mCtx.moveTo(x-sz,cy-bR-sz);mCtx.lineTo(x+sz,cy-bR+sz);mCtx.stroke();
+    mCtx.beginPath();mCtx.moveTo(x+sz,cy-bR-sz);mCtx.lineTo(x-sz,cy-bR+sz);mCtx.stroke();
+    // Below: B out of page (dot)
+    mCtx.fillStyle=`rgba(121,192,255,${bAlpha})`;
+    mCtx.beginPath();mCtx.arc(x,cy+bR,sz,0,Math.PI*2);mCtx.fill();
+  }
+  mCtx.fillStyle='#79c0ff';mCtx.font='bold 11px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('B ⊗ (into page)',cx,cy-bR-15);
+  mCtx.fillText('B ⊙ (out of page)',cx,cy+bR+20);
+
+  // POYNTING VECTORS — radially inward toward resistor
+  const sScale=Math.min(60,P*2);
+  const nS=16;
+  for(let i=0;i<nS;i++){
+    const angle=(i/nS)*Math.PI*2+time*spd*0.8;
+    const r1=Math.max(rW/2,rH/2)+30+sScale;
+    const r2=Math.max(rW/2,rH/2)+30;
+    const x0=cx+Math.cos(angle)*r1;
+    const y0=cy+Math.sin(angle)*r1;
+    const x1=cx+Math.cos(angle)*r2;
+    const y1=cy+Math.sin(angle)*r2;
+    arrow(mCtx,x0,y0,x1,y1,`rgba(255,166,87,${Math.min(0.7,P*0.03)})`,6);
+  }
+
+  // Animated energy particles flowing inward
+  const pCount=Math.min(30,Math.round(P*1.5));
+  for(let p=0;p<pCount;p++){
+    const angle=(p/pCount)*Math.PI*2;
+    const phase=((time*spd*1.5+p*0.15)%1);
+    const r=r_lerp(150,35,phase);
+    const px=cx+Math.cos(angle)*r;
+    const py=cy+Math.sin(angle)*r;
+    const alpha=Math.sin(Math.PI*phase)*0.8;
+    mCtx.beginPath();mCtx.arc(px,py,2.5,0,Math.PI*2);
+    mCtx.fillStyle=`rgba(255,166,87,${alpha})`;
+    mCtx.shadowColor='#ffa657';mCtx.shadowBlur=6;mCtx.fill();mCtx.shadowBlur=0;
+  }
+
+  // S label
+  mCtx.fillStyle='#ffa657';mCtx.font='bold 13px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('S = E × B / μ₀ → (radially inward)',cx,40);
+  mCtx.fillStyle='#8b949e';mCtx.font='11px sans-serif';
+  mCtx.fillText('Energy flows through the FIELDS, not through the wire!',cx,58);
+
+  // Key insight box
+  mCtx.fillStyle='#161b22';mCtx.strokeStyle='#ffa65740';mCtx.lineWidth=1;
+  mCtx.beginPath();mCtx.roundRect(cx-200,H-70,400,55,8);mCtx.fill();mCtx.stroke();
+  mCtx.fillStyle='#ffa657';mCtx.font='bold 11px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('∮ S · dA = P_dissipated = V²/R = '+P.toFixed(1)+' W',cx,H-48);
+  mCtx.fillStyle='#8b949e';mCtx.font='10px sans-serif';
+  mCtx.fillText('Total Poynting flux through surface around resistor = power dissipated',cx,H-30);
+
+  setM('mV',V.toFixed(1)+' V');
+  setM('mI',I.toFixed(2)+' A');
+  setM('mP',P.toFixed(1)+' W');
+  setM('mS',(P/(2*Math.PI*0.05*rW)).toFixed(1)+' W/m²');
+
+  // Charts
+  document.getElementById('ch1Title').textContent='Poynting flux |S| vs distance from wire';
+  document.getElementById('ch2Title').textContent='Energy balance: P_in(S) = P_dissipated(J·E)';
+  drawResistorCharts(V,R,I,P);
+}
+
+function r_lerp(a,b,t){return a+(b-a)*t;}
+
+function drawResistorCharts(V,R,I,P){
+  // Chart 1: |S| vs r
+  const W=c1C.width,H=c1C.height;
+  const pad={l:45,r:15,t:12,b:25};
+  const pW=W-pad.l-pad.r,pH=H-pad.t-pad.b;
+  c1Ctx.clearRect(0,0,W,H);drawGrid(c1Ctx,W,H,pad);
+
+  c1Ctx.strokeStyle='#ffa657';c1Ctx.lineWidth=2;
+  c1Ctx.beginPath();
+  const sMax=P*5;
+  for(let i=0;i<=200;i++){
+    const r=5+i;
+    const s=P/(2*Math.PI*r*0.01);
+    const x=pad.l+(i/200)*pW;
+    const y=pad.t+pH-(s/sMax)*pH;
+    i===0?c1Ctx.moveTo(x,Math.max(pad.t,y)):c1Ctx.lineTo(x,Math.max(pad.t,y));
+  }
+  c1Ctx.stroke();
+  c1Ctx.fillStyle='#ffa657';c1Ctx.font='bold 10px sans-serif';c1Ctx.textAlign='left';
+  c1Ctx.fillText('|S| ∝ 1/r',pad.l+pW-50,pad.t+15);
+  c1Ctx.fillStyle='#484f58';c1Ctx.font='9px sans-serif';c1Ctx.textAlign='center';
+  c1Ctx.fillText('Distance from wire →',pad.l+pW/2,H-5);
+
+  // Chart 2: Power balance bar chart
+  const W2=c2C.width,H2=c2C.height;
+  c2Ctx.clearRect(0,0,W2,H2);
+
+  const barW=80,gap=40;
+  const bx1=W2/2-barW-gap/2, bx2=W2/2+gap/2;
+  const maxP=Math.max(P,1);
+  const barMaxH=pH-10;
+
+  // P_in from Poynting
+  const h1=Math.min(barMaxH,(P/maxP)*barMaxH);
+  c2Ctx.fillStyle='#ffa65740';
+  c2Ctx.fillRect(bx1,pad.t+barMaxH-h1,barW,h1);
+  c2Ctx.strokeStyle='#ffa657';c2Ctx.lineWidth=2;
+  c2Ctx.strokeRect(bx1,pad.t+barMaxH-h1,barW,h1);
+
+  // P_dissipated J·E
+  const h2=Math.min(barMaxH,(P/maxP)*barMaxH);
+  c2Ctx.fillStyle='#7ee78740';
+  c2Ctx.fillRect(bx2,pad.t+barMaxH-h2,barW,h2);
+  c2Ctx.strokeStyle='#7ee787';c2Ctx.lineWidth=2;
+  c2Ctx.strokeRect(bx2,pad.t+barMaxH-h2,barW,h2);
+
+  // Labels
+  c2Ctx.fillStyle='#ffa657';c2Ctx.font='bold 11px sans-serif';c2Ctx.textAlign='center';
+  c2Ctx.fillText('∮S·dA',bx1+barW/2,pad.t+barMaxH+16);
+  c2Ctx.fillText(P.toFixed(1)+' W',bx1+barW/2,pad.t+barMaxH-h1-6);
+  c2Ctx.fillStyle='#7ee787';
+  c2Ctx.fillText('∫J·E dV',bx2+barW/2,pad.t+barMaxH+16);
+  c2Ctx.fillText(P.toFixed(1)+' W',bx2+barW/2,pad.t+barMaxH-h2-6);
+
+  // Equals sign
+  c2Ctx.fillStyle='#e6edf3';c2Ctx.font='bold 20px sans-serif';
+  c2Ctx.fillText('=',W2/2,pad.t+barMaxH/2);
+}
+
+/* ===== TAB 1: EM WAVE ===== */
+function drawEMWavePoynting(){
+  const W=mainC.width,H=mainC.height,cx=W/2,cy=H/2;
+  mCtx.clearRect(0,0,W,H);
+  const amp=cv('amp'),freq=cv('freq'),spd=cv('speed');
+  const waveLen=280,k=2*Math.PI/waveLen,omega=2*Math.PI*freq;
+  const phase=omega*time*spd;
+  const startX=60,endX=W-60;
+  const eScale=(H/2-60)*amp;
+
+  // Propagation axis
+  mCtx.strokeStyle='#ffffff12';mCtx.lineWidth=1;mCtx.setLineDash([6,6]);
+  mCtx.beginPath();mCtx.moveTo(startX,cy);mCtx.lineTo(endX,cy);mCtx.stroke();mCtx.setLineDash([]);
+
+  // E field
+  mCtx.strokeStyle='#f97583';mCtx.lineWidth=2.5;mCtx.shadowColor='#f97583';mCtx.shadowBlur=5;
+  mCtx.beginPath();
+  for(let x=startX;x<=endX;x+=2){
+    const E=Math.sin(k*(x-startX)-phase)*eScale;
+    x===startX?mCtx.moveTo(x,cy-E):mCtx.lineTo(x,cy-E);
+  }
+  mCtx.stroke();mCtx.shadowBlur=0;
+
+  // E vectors
+  for(let x=startX;x<=endX;x+=25){
+    const E=Math.sin(k*(x-startX)-phase)*eScale;
+    if(Math.abs(E)<3)continue;
+    mCtx.strokeStyle='#f9758340';mCtx.lineWidth=1;
+    mCtx.beginPath();mCtx.moveTo(x,cy);mCtx.lineTo(x,cy-E);mCtx.stroke();
+  }
+
+  // B field (perspective depth)
+  mCtx.strokeStyle='#79c0ff';mCtx.lineWidth=2.5;mCtx.shadowColor='#79c0ff';mCtx.shadowBlur=5;
+  mCtx.beginPath();
+  for(let x=startX;x<=endX;x+=2){
+    const B=Math.sin(k*(x-startX)-phase)*eScale*0.6;
+    const px=x+B*0.3;const py=cy+B*0.15;
+    x===startX?mCtx.moveTo(px,py):mCtx.lineTo(px,py);
+  }
+  mCtx.stroke();mCtx.shadowBlur=0;
+
+  // Poynting vector arrows along propagation
+  for(let x=startX+40;x<=endX-40;x+=60){
+    const E=Math.sin(k*(x-startX)-phase);
+    const B=E; // in phase for plane wave
+    const S=E*B; // S = E×B, always positive for plane wave energy
+    const sAbs=Math.abs(S);
+    if(sAbs<0.05)continue;
+    const len=sAbs*40;
+    const alpha=Math.min(0.8,sAbs);
+    const aY=cy+eScale+35;
+    arrow(mCtx,x-len/2,aY,x+len/2,aY,`rgba(255,166,87,${alpha})`,7);
+  }
+
+  // S² oscillation visualization (bar below wave)
+  for(let x=startX;x<=endX;x+=4){
+    const E=Math.sin(k*(x-startX)-phase);
+    const S=E*E; // |S| ∝ E²
+    const barH=S*30*amp*amp;
+    mCtx.fillStyle=`rgba(255,166,87,${S*0.4})`;
+    mCtx.fillRect(x-1,cy+eScale+50,3,barH);
+  }
+
+  // Energy density stripe
+  for(let x=startX;x<=endX;x+=4){
+    const E=Math.sin(k*(x-startX)-phase);
+    const uE=0.5*E*E;const uB=0.5*E*E*0.36;
+    const u=uE+uB;
+    mCtx.fillStyle=`rgba(210,168,255,${u*0.3})`;
+    mCtx.fillRect(x-1,cy-eScale-35,3,-u*25);
+  }
+
+  // Labels
+  mCtx.fillStyle='#f97583';mCtx.font='bold 11px sans-serif';mCtx.textAlign='right';
+  mCtx.fillText('E ↕',endX+5,cy-eScale*0.5);
+  mCtx.fillStyle='#79c0ff';mCtx.fillText('B ↔',endX+5,cy+10);
+  mCtx.fillStyle='#ffa657';mCtx.font='bold 12px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('S = E × B / μ₀  →  (energy propagation)',cx,35);
+  mCtx.fillStyle='#d2a8ff';mCtx.font='11px sans-serif';
+  mCtx.fillText('u = ½ε₀E² + ½B²/μ₀',cx,cy-eScale-45);
+  mCtx.fillStyle='#ffa657';
+  mCtx.fillText('|S(z,t)| = E²/μ₀c (instantaneous)',cx,cy+eScale+92);
+
+  // Time average
+  const Savg=0.5*amp*amp;
+  mCtx.fillStyle='#7ee787';mCtx.font='bold 11px sans-serif';
+  mCtx.fillText('⟨S⟩ = E₀²/(2μ₀c) = '+Savg.toFixed(2)+' (time average)',cx,H-15);
+
+  const Enow=Math.sin(-phase)*amp;
+  setM('mE',Enow.toFixed(3));
+  setM('mB',(Enow*0.6).toFixed(3));
+  setM('mS',(Enow*Enow*0.6).toFixed(3));
+  setM('mSavg',Savg.toFixed(3));
+
+  // Charts
+  document.getElementById('ch1Title').textContent='E(t) and B(t) at z=0';
+  document.getElementById('ch2Title').textContent='|S(t)| and ⟨S⟩ at z=0';
+  drawWaveCharts(amp,freq,spd);
+}
+
+function drawWaveCharts(amp,freq,spd){
+  const pad={l:40,r:10,t:10,b:20};
+  [c1Ctx,c2Ctx].forEach((ctx,ci)=>{
+    const c=ci===0?c1C:c2C;
+    const W=c.width,H=c.height;
+    const pW=W-pad.l-pad.r,pH=H-pad.t-pad.b;
+    ctx.clearRect(0,0,W,H);drawGrid(ctx,W,H,pad);
+    const midY=pad.t+pH/2;
+    const window=4/freq;
+
+    if(ci===0){
+      [{fn:t=>Math.sin(-2*Math.PI*freq*t)*amp,color:'#f97583',label:'E'},
+       {fn:t=>Math.sin(-2*Math.PI*freq*t)*amp*0.6,color:'#79c0ff',label:'B'}].forEach(({fn,color,label})=>{
+        ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+        for(let i=0;i<=300;i++){
+          const t=time*spd-window+(i/300)*window;
+          const v=fn(t);const x=pad.l+(i/300)*pW;const y=midY-v*(pH/2*0.85);
+          i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.fillStyle=color;ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+        ctx.fillText(label,pad.l+pW+2,midY);
+      });
+    } else {
+      // |S| and average
+      const base=pad.t+pH-5;
+      ctx.strokeStyle='#ffa657';ctx.lineWidth=2;ctx.beginPath();
+      for(let i=0;i<=300;i++){
+        const t=time*spd-window+(i/300)*window;
+        const E=Math.sin(-2*Math.PI*freq*t)*amp;
+        const S=E*E*0.6;
+        const x=pad.l+(i/300)*pW;const y=base-S*pH*0.8;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      // Average line
+      const avgS=0.5*amp*amp*0.6;
+      const avgY=base-avgS*pH*0.8;
+      ctx.strokeStyle='#7ee787';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(pad.l,avgY);ctx.lineTo(pad.l+pW,avgY);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#7ee787';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText('⟨S⟩',pad.l+pW+2,avgY);
+      ctx.fillStyle='#ffa657';ctx.fillText('|S|',pad.l+pW+2,base-20);
+    }
+  });
+}
+
+/* ===== TAB 2: CHARGING CAPACITOR ===== */
+function drawCapacitor(){
+  const W=mainC.width,H=mainC.height,cx=W/2,cy=H/2;
+  mCtx.clearRect(0,0,W,H);
+  const Ic=cv('current'),plateR=cv('capSize'),spd=cv('speed');
+
+  // Charge accumulates over time
+  const Q=Ic*time*spd*0.3;
+  const Estr=Q*0.5; // E field strength
+  const gapW=60;
+
+  // Plates
+  const plateH=plateR*2;
+  mCtx.fillStyle='#484f58';
+  mCtx.fillRect(cx-gapW/2-8,cy-plateH/2,8,plateH);
+  mCtx.fillRect(cx+gapW/2,cy-plateH/2,8,plateH);
+
+  // Charge indicators
+  const nCharges=Math.min(10,Math.round(Math.abs(Q)*3));
+  mCtx.font='bold 14px sans-serif';mCtx.textAlign='center';
+  for(let i=0;i<nCharges;i++){
+    const y=cy-plateH/2+10+(i/(nCharges))*plateH*0.8;
+    mCtx.fillStyle='#79c0ff';mCtx.fillText('+',cx-gapW/2-12,y+5);
+    mCtx.fillStyle='#f97583';mCtx.fillText('−',cx+gapW/2+12,y+5);
+  }
+
+  // E field in gap
+  const eAlpha=Math.min(0.7,Estr*0.3);
+  if(eAlpha>0.02){
+    for(let gy=cy-plateH/2+15;gy<=cy+plateH/2-15;gy+=20){
+      const len=Math.min(gapW-10,Estr*15);
+      if(len<3)continue;
+      arrow(mCtx,cx-len/2,gy,cx+len/2,gy,`rgba(249,117,131,${eAlpha})`,6);
+    }
+  }
+  mCtx.fillStyle='#f97583';mCtx.font='bold 11px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('E = '+Estr.toFixed(2),cx,cy+plateH/2+25);
+
+  // B field (displacement current) — circular inside gap
+  const dEdt=Ic>0.1?Estr*0.5:0;
+  const bAlpha=Math.min(0.6,dEdt*0.3);
+  if(bAlpha>0.03){
+    for(let r=20;r<=plateR*0.8;r+=25){
+      mCtx.strokeStyle=`rgba(121,192,255,${bAlpha*(1-r/(plateR))})`;
+      mCtx.lineWidth=1.5;
+      mCtx.beginPath();mCtx.arc(cx,cy,r,0,Math.PI*2);mCtx.stroke();
+
+      // Direction arrows
+      const nArr=Math.max(3,Math.round(r/20));
+      for(let a=0;a<nArr;a++){
+        const angle=(a/nArr)*Math.PI*2+time*spd*2;
+        const ax=cx+Math.cos(angle)*r;
+        const ay=cy+Math.sin(angle)*r;
+        const tx=Math.sin(angle),ty=-Math.cos(angle);
+        mCtx.fillStyle=`rgba(121,192,255,${bAlpha})`;
+        mCtx.beginPath();
+        mCtx.moveTo(ax+tx*6,ay+ty*6);
+        mCtx.lineTo(ax-ty*3,ay+tx*3);
+        mCtx.lineTo(ax+ty*3,ay-tx*3);
+        mCtx.closePath();mCtx.fill();
+      }
+    }
+  }
+
+  // POYNTING VECTORS — radially inward at gap edges
+  const sStr=Estr*dEdt;
+  if(sStr>0.01){
+    const nS=16;
+    for(let i=0;i<nS;i++){
+      const angle=(i/nS)*Math.PI*2+time*spd*0.5;
+      const r1=plateR+20;
+      const r2=gapW/2+5;
+      const x0=cx+Math.cos(angle)*r1;
+      const y0=cy+Math.sin(angle)*r1;
+      const x1=cx+Math.cos(angle)*r2;
+      const y1=cy+Math.sin(angle)*r2;
+      const alpha=Math.min(0.6,sStr*0.1);
+      arrow(mCtx,x0,y0,x1,y1,`rgba(255,166,87,${alpha})`,6);
+    }
+
+    // Energy particles
+    for(let p=0;p<15;p++){
+      const angle=(p/15)*Math.PI*2;
+      const phase=((time*spd*1.2+p*0.1)%1);
+      const r=r_lerp(plateR+15,gapW/2+5,phase);
+      const px=cx+Math.cos(angle)*r;
+      const py=cy+Math.sin(angle)*r;
+      const a=Math.sin(Math.PI*phase)*0.7;
+      mCtx.beginPath();mCtx.arc(px,py,2,0,Math.PI*2);
+      mCtx.fillStyle=`rgba(255,166,87,${a})`;mCtx.fill();
+    }
+  }
+
+  // Wires
+  mCtx.strokeStyle='#8b949e';mCtx.lineWidth=3;
+  mCtx.beginPath();mCtx.moveTo(100,cy);mCtx.lineTo(cx-gapW/2-8,cy);mCtx.stroke();
+  mCtx.beginPath();mCtx.moveTo(cx+gapW/2+8,cy);mCtx.lineTo(W-100,cy);mCtx.stroke();
+
+  // Current dots
+  if(Ic>0.1){
+    const dotSpd=time*spd*60;
+    for(let d=0;d<5;d++){
+      const t=((dotSpd+d*60)%300)/300;
+      mCtx.fillStyle='#ffcc00';
+      mCtx.beginPath();mCtx.arc(100+t*(cx-gapW/2-108),cy,3,0,Math.PI*2);mCtx.fill();
+    }
+  }
+
+  mCtx.fillStyle='#ffa657';mCtx.font='bold 13px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('S = E × B / μ₀  →  inward (storing energy)',cx,35);
+  mCtx.fillStyle='#79c0ff';mCtx.font='11px sans-serif';
+  mCtx.fillText('B from displacement current: μ₀ε₀ ∂E/∂t',cx,55);
+
+  const U=0.5*Estr*Estr*0.1;
+  mCtx.fillStyle='#7ee787';mCtx.font='bold 12px sans-serif';
+  mCtx.fillText('U = ½ε₀E²·Vol = '+U.toFixed(3)+' J',cx,H-20);
+
+  setM('mE',Estr.toFixed(2));
+  setM('mQ',Q.toFixed(2)+' C');
+  setM('mU',U.toFixed(3)+' J');
+  setM('mS',sStr.toFixed(3)+' W/m²');
+
+  document.getElementById('ch1Title').textContent='E field & Charge vs time';
+  document.getElementById('ch2Title').textContent='Stored energy U vs time';
+  drawCapCharts(Estr,Q,U,spd);
+}
+
+function drawCapCharts(Estr,Q,U,spd){
+  const pad={l:40,r:10,t:10,b:20};
+  [c1Ctx,c2Ctx].forEach((ctx,ci)=>{
+    const c=ci===0?c1C:c2C;const W=c.width,H=c.height;
+    const pW=W-pad.l-pad.r,pH=H-pad.t-pad.b;
+    ctx.clearRect(0,0,W,H);drawGrid(ctx,W,H,pad);
+    const base=pad.t+pH-5;
+
+    if(ci===0){
+      // E and Q increase linearly with time
+      [{val:Estr,color:'#f97583',label:'E'},{val:Q,color:'#79c0ff',label:'Q'}].forEach(({val,color,label},j)=>{
+        ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+        const max=Math.max(val,0.5)*1.2;
+        for(let i=0;i<=200;i++){
+          const t=(i/200)*time*spd;
+          const v=cv('current')*t*0.3*(j===0?0.5:1);
+          const x=pad.l+(i/200)*pW;
+          const y=base-Math.min(1,v/max)*pH*0.85;
+          i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.fillStyle=color;ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+        ctx.fillText(label,pad.l+pW+2,base-pH*0.4+j*14);
+      });
+    } else {
+      // U = ½E² grows quadratically
+      ctx.strokeStyle='#7ee787';ctx.lineWidth=2;ctx.beginPath();
+      const max=Math.max(U,0.01)*1.2;
+      for(let i=0;i<=200;i++){
+        const t=(i/200)*time*spd;
+        const e=cv('current')*t*0.3*0.5;
+        const u=0.5*e*e*0.1;
+        const x=pad.l+(i/200)*pW;
+        const y=base-Math.min(1,u/max)*pH*0.85;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.fillStyle='#7ee787';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText('U ∝ t²',pad.l+pW+2,base-pH*0.4);
+    }
+  });
+}
+
+/* ===== TAB 3: COAXIAL CABLE ===== */
+function drawCoax(){
+  const W=mainC.width,H=mainC.height,cx=W/2,cy=H/2;
+  mCtx.clearRect(0,0,W,H);
+  const V=cv('voltage'),I=cv('current'),spd=cv('speed');
+  const P=V*I;
+
+  // Cross-section view (left) and side view (right)
+  const crossCx=250,crossCy=cy;
+  const sideCx=700,sideCy=cy;
+
+  // === CROSS SECTION ===
+  mCtx.fillStyle='#8b949e';mCtx.font='bold 12px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('Cross Section',crossCx,45);
+
+  // Outer conductor
+  const outerR=120,innerR=25,dielR=100;
+  mCtx.strokeStyle='#484f58';mCtx.lineWidth=3;
+  mCtx.beginPath();mCtx.arc(crossCx,crossCy,outerR,0,Math.PI*2);mCtx.stroke();
+  mCtx.fillStyle='#21262d08';mCtx.fill();
+
+  // Dielectric
+  mCtx.fillStyle='#1f6feb10';
+  mCtx.beginPath();mCtx.arc(crossCx,crossCy,dielR,0,Math.PI*2);mCtx.fill();
+
+  // Inner conductor
+  mCtx.fillStyle='#484f58';
+  mCtx.beginPath();mCtx.arc(crossCx,crossCy,innerR,0,Math.PI*2);mCtx.fill();
+
+  // E field (radial)
+  const eAlpha=Math.min(0.7,V*0.05);
+  const nE=16;
+  for(let i=0;i<nE;i++){
+    const angle=(i/nE)*Math.PI*2;
+    const x0=crossCx+Math.cos(angle)*(innerR+5);
+    const y0=crossCy+Math.sin(angle)*(innerR+5);
+    const x1=crossCx+Math.cos(angle)*(dielR-5);
+    const y1=crossCy+Math.sin(angle)*(dielR-5);
+    arrow(mCtx,x0,y0,x1,y1,`rgba(249,117,131,${eAlpha})`,5);
+  }
+
+  // B field (circumferential)
+  const bAlpha=Math.min(0.6,I*0.15);
+  for(let r=40;r<=90;r+=25){
+    mCtx.strokeStyle=`rgba(121,192,255,${bAlpha*(1-r/100)})`;
+    mCtx.lineWidth=1.5;
+    mCtx.beginPath();mCtx.arc(crossCx,crossCy,r,0,Math.PI*2);mCtx.stroke();
+
+    // Direction arrows
+    const nArr=Math.max(4,Math.round(r/15));
+    for(let a=0;a<nArr;a++){
+      const angle=(a/nArr)*Math.PI*2+time*spd*2;
+      const ax=crossCx+Math.cos(angle)*r;
+      const ay=crossCy+Math.sin(angle)*r;
+      const tx=Math.sin(angle),ty=-Math.cos(angle);
+      mCtx.fillStyle=`rgba(121,192,255,${bAlpha})`;
+      mCtx.beginPath();
+      mCtx.moveTo(ax+tx*5,ay+ty*5);
+      mCtx.lineTo(ax-ty*3,ay+tx*3);
+      mCtx.lineTo(ax+ty*3,ay-tx*3);
+      mCtx.closePath();mCtx.fill();
+    }
+  }
+
+  // S vectors (into page — shown as dots in dielectric)
+  const sAlpha=Math.min(0.7,P*0.02);
+  if(sAlpha>0.02){
+    for(let r=innerR+10;r<dielR;r+=15){
+      const nDots=Math.round(r/8);
+      for(let d=0;d<nDots;d++){
+        const angle=(d/nDots)*Math.PI*2+time*spd*0.5;
+        const px=crossCx+Math.cos(angle)*r;
+        const py=crossCy+Math.sin(angle)*r;
+        const sz=Math.min(4,P*0.15/(r/40));
+        mCtx.fillStyle=`rgba(255,166,87,${sAlpha})`;
+        mCtx.beginPath();mCtx.arc(px,py,sz,0,Math.PI*2);mCtx.fill();
+      }
+    }
+    mCtx.fillStyle='#ffa657';mCtx.font='bold 11px sans-serif';mCtx.textAlign='center';
+    mCtx.fillText('S ⊙ (out of page)',crossCx,crossCy+outerR+25);
+    mCtx.fillText('Energy in DIELECTRIC',crossCx,crossCy+outerR+42);
+  }
+
+  // Labels
+  mCtx.fillStyle='#f97583';mCtx.font='10px sans-serif';mCtx.textAlign='left';
+  mCtx.fillText('E (radial)',crossCx+dielR+8,crossCy-10);
+  mCtx.fillStyle='#79c0ff';
+  mCtx.fillText('B (circular)',crossCx+dielR+8,crossCy+10);
+
+  // === SIDE VIEW ===
+  mCtx.fillStyle='#8b949e';mCtx.font='bold 12px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('Side View (cutaway)',sideCx,45);
+
+  const sideW=300,sideH=160;
+  const sX=sideCx-sideW/2,sY=sideCy-sideH/2;
+
+  // Outer conductor (top & bottom)
+  mCtx.fillStyle='#484f58';
+  mCtx.fillRect(sX,sY,sideW,8);
+  mCtx.fillRect(sX,sY+sideH-8,sideW,8);
+
+  // Inner conductor
+  mCtx.fillStyle='#484f58';
+  mCtx.fillRect(sX,sideCy-4,sideW,8);
+
+  // Dielectric
+  mCtx.fillStyle='#1f6feb08';
+  mCtx.fillRect(sX,sY+8,sideW,sideH-16);
+
+  // E field arrows (radial from center conductor)
+  for(let x=sX+20;x<sX+sideW;x+=35){
+    const len=Math.min(30,V*2);
+    if(len<2)continue;
+    arrow(mCtx,x,sideCy-8,x,sideCy-8-len,`rgba(249,117,131,${eAlpha})`,4);
+    arrow(mCtx,x,sideCy+8,x,sideCy+8+len,`rgba(249,117,131,${eAlpha})`,4);
+  }
+
+  // B field (into/out of page in side view)
+  const bSz=Math.min(5,I*2);
+  for(let x=sX+20;x<sX+sideW;x+=35){
+    // Top region: into page
+    mCtx.strokeStyle=`rgba(121,192,255,${bAlpha})`;mCtx.lineWidth=1.5;
+    const by1=sY+30;
+    mCtx.beginPath();mCtx.moveTo(x-bSz,by1-bSz);mCtx.lineTo(x+bSz,by1+bSz);mCtx.stroke();
+    mCtx.beginPath();mCtx.moveTo(x+bSz,by1-bSz);mCtx.lineTo(x-bSz,by1+bSz);mCtx.stroke();
+    // Bottom region: out of page
+    const by2=sY+sideH-30;
+    mCtx.fillStyle=`rgba(121,192,255,${bAlpha})`;
+    mCtx.beginPath();mCtx.arc(x,by2,bSz,0,Math.PI*2);mCtx.fill();
+  }
+
+  // Poynting S arrows (axial — along cable)
+  if(P>0.1){
+    const sLen=Math.min(40,P*2);
+    for(let y=sY+20;y<sY+sideH;y+=25){
+      if(Math.abs(y-sideCy)<10)continue;
+      arrow(mCtx,sX+sideW+10,y,sX+sideW+10+sLen,y,`rgba(255,166,87,${sAlpha})`,6);
+    }
+    mCtx.fillStyle='#ffa657';mCtx.font='bold 11px sans-serif';mCtx.textAlign='left';
+    mCtx.fillText('S →',sX+sideW+15,sY-5);
+  }
+
+  // Current dots in center conductor
+  if(I>0.1){
+    const dotSpd=time*spd*80;
+    for(let d=0;d<6;d++){
+      const x=sX+((dotSpd+d*50)%sideW);
+      mCtx.fillStyle='#ffcc00';
+      mCtx.beginPath();mCtx.arc(x,sideCy,2.5,0,Math.PI*2);mCtx.fill();
+    }
+  }
+
+  // Title equation
+  mCtx.fillStyle='#ffa657';mCtx.font='bold 13px sans-serif';mCtx.textAlign='center';
+  mCtx.fillText('P = V·I = ∫S·dA = '+ P.toFixed(1)+' W',cx,H-15);
+  mCtx.fillStyle='#8b949e';mCtx.font='11px sans-serif';
+  mCtx.fillText('Power flows in the dielectric gap, NOT in the copper conductors!',cx,H-35);
+
+  setM('mV',V.toFixed(1)+' V');
+  setM('mI',I.toFixed(1)+' A');
+  setM('mP',P.toFixed(1)+' W');
+  setM('mS',P.toFixed(1)+' W');
+
+  document.getElementById('ch1Title').textContent='|S(r)| vs radial distance';
+  document.getElementById('ch2Title').textContent='Power distribution in dielectric';
+  drawCoaxCharts(V,I,P,innerR,dielR);
+}
+
+function drawCoaxCharts(V,I,P,a,b){
+  const pad={l:40,r:10,t:10,b:20};
+  // Chart 1: S vs r (1/r² dependence)
+  const W1=c1C.width,H1=c1C.height;
+  const pW=W1-pad.l-pad.r,pH=H1-pad.t-pad.b;
+  c1Ctx.clearRect(0,0,W1,H1);drawGrid(c1Ctx,W1,H1,pad);
+  const base=pad.t+pH-5;
+
+  c1Ctx.strokeStyle='#ffa657';c1Ctx.lineWidth=2;c1Ctx.beginPath();
+  const maxS=P*3;
+  for(let i=0;i<=200;i++){
+    const r=a+0.5+(i/200)*(b-a);
+    const s=P/(2*Math.PI*r*0.01);
+    const x=pad.l+(i/200)*pW;
+    const y=base-Math.min(1,s/maxS)*pH*0.85;
+    i===0?c1Ctx.moveTo(x,y):c1Ctx.lineTo(x,y);
+  }
+  c1Ctx.stroke();
+
+  // Mark conductors
+  c1Ctx.fillStyle='#484f5840';
+  c1Ctx.fillRect(pad.l-5,pad.t,8,pH);
+  c1Ctx.fillRect(pad.l+pW-3,pad.t,8,pH);
+  c1Ctx.fillStyle='#8b949e';c1Ctx.font='9px sans-serif';c1Ctx.textAlign='center';
+  c1Ctx.fillText('inner',pad.l+5,H1-5);
+  c1Ctx.fillText('outer',pad.l+pW,H1-5);
+  c1Ctx.fillText('|S| ∝ 1/r',pad.l+pW/2,pad.t+12);
+
+  // Chart 2: Cumulative power
+  const W2=c2C.width,H2=c2C.height;
+  c2Ctx.clearRect(0,0,W2,H2);drawGrid(c2Ctx,W2,H2,pad);
+
+  c2Ctx.strokeStyle='#7ee787';c2Ctx.lineWidth=2;c2Ctx.beginPath();
+  c2Ctx.fillStyle='#7ee78720';
+  c2Ctx.moveTo(pad.l,base);
+  for(let i=0;i<=200;i++){
+    const r=a+0.5+(i/200)*(b-a);
+    const cumP=P*Math.log(r/a)/Math.log(b/a);
+    const x=pad.l+(i/200)*pW;
+    const y=base-Math.min(1,cumP/P)*pH*0.85;
+    c2Ctx.lineTo(x,y);
+  }
+  c2Ctx.stroke();
+  // Fill
+  c2Ctx.lineTo(pad.l+pW,base);c2Ctx.lineTo(pad.l,base);c2Ctx.closePath();c2Ctx.fill();
+
+  c2Ctx.fillStyle='#7ee787';c2Ctx.font='bold 10px sans-serif';c2Ctx.textAlign='left';
+  c2Ctx.fillText('∫S·dA = V·I',pad.l+pW+2,pad.t+15);
+  c2Ctx.fillStyle='#8b949e';c2Ctx.font='9px sans-serif';c2Ctx.textAlign='center';
+  c2Ctx.fillText('Cumulative power vs radius (logarithmic)',pad.l+pW/2,H2-5);
+}
+
+/* ===== ANIMATION ===== */
+function animate(ts){
+  if(!lastTs)lastTs=ts;
+  const dt=Math.min((ts-lastTs)/1000,0.04);
+  lastTs=ts;
+  if(!paused){
+    time+=dt;
+    switch(currentTab){
+      case 0:drawResistor();break;
+      case 1:drawEMWavePoynting();break;
+      case 2:drawCapacitor();break;
+      case 3:drawCoax();break;
+    }
+  }
+  requestAnimationFrame(animate);
+}
+buildUI(0);
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
