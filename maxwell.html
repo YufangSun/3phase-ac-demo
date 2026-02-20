@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxwell's Equations — Interactive Demo</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+  h1{font-size:1.6em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.95em;text-align:center}
+  canvas{display:block;border-radius:10px}
+  .tabs{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap;justify-content:center}
+  .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.88em;
+    background:#161b22;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .tab:hover{border-color:#58a6ff;color:#e6edf3}
+  .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+  .eq-box{background:#161b22;border:1px solid #30363d;border-radius:10px;
+    padding:10px 16px;margin:8px 0;max-width:900px;width:100%;text-align:center}
+  .eq{font-size:1.15em;font-family:'Times New Roman',serif;color:#e0e0ff;letter-spacing:.5px}
+  .eq-name{font-size:.8em;color:#8b949e;margin-top:2px}
+  .eq-desc{font-size:.82em;color:#7d8590;margin-top:4px;line-height:1.5}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;justify-content:center;align-items:center}
+  .cg{display:flex;align-items:center;gap:5px}
+  .cg label{font-size:.8em;color:#8b949e;white-space:nowrap}
+  input[type="range"]{width:100px;accent-color:#f78166}
+  .val{font-size:.8em;color:#f78166;min-width:36px}
+  button{background:#238636;color:white;border:none;padding:6px 16px;border-radius:6px;
+    cursor:pointer;font-size:.85em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d}
+  button.sec:hover{background:#484f58}
+  .legend{display:flex;gap:14px;justify-content:center;margin:6px 0;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:4px;font-size:.78em}
+  .legend-dot{width:9px;height:9px;border-radius:50%}
+  .info{max-width:1100px;width:100%;background:#161b22;border-radius:12px;
+    padding:14px 18px;border:1px solid #30363d;margin-top:14px;font-size:.85em;line-height:1.6;color:#8b949e}
+  .info strong{color:#e0e0ff}
+  .info code{color:#f78166;background:#21262d;padding:1px 4px;border-radius:3px}
+  a{color:#58a6ff}
+  .row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:10px;max-width:1100px;width:100%}
+  .panel{background:#161b22;border-radius:12px;padding:14px;border:1px solid #30363d;flex:1;min-width:260px}
+  .panel h2{font-size:.9em;color:#8b949e;margin-bottom:6px;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>Maxwell's Equations</h1>
+<p class="subtitle">The four laws governing all electromagnetic phenomena — visualized interactively</p>
+
+<div class="tabs">
+  <div class="tab active" data-tab="0">EM Wave Propagation</div>
+  <div class="tab" data-tab="1">Gauss's Law (E)</div>
+  <div class="tab" data-tab="2">Gauss's Law (B)</div>
+  <div class="tab" data-tab="3">Faraday's Law</div>
+  <div class="tab" data-tab="4">Ampère–Maxwell Law</div>
+</div>
+
+<div id="eqBox" class="eq-box">
+  <div class="eq" id="eqText"></div>
+  <div class="eq-name" id="eqName"></div>
+  <div class="eq-desc" id="eqDesc"></div>
+</div>
+
+<canvas id="mainCanvas" width="1060" height="480"></canvas>
+
+<div id="legendBox" class="legend"></div>
+
+<div id="ctrlBox" class="controls"></div>
+
+<div class="row">
+  <div class="panel">
+    <h2 id="chart1Title">Field Amplitude</h2>
+    <canvas id="chart1" width="520" height="180"></canvas>
+  </div>
+  <div class="panel">
+    <h2 id="chart2Title">Energy Density</h2>
+    <canvas id="chart2" width="520" height="180"></canvas>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Maxwell's Equations</strong> unify electricity, magnetism, and light into one framework.
+  Together they predict electromagnetic waves traveling at the speed of light:
+  <code>c = 1/√(μ₀ε₀)</code>.
+  Each tab visualizes one of the four equations interactively.
+  <br><br>
+  <a href="index.html">← 3-Phase AC</a> ·
+  <a href="mutual-inductance.html">Mutual Inductance</a> ·
+  <a href="bounce-diagram.html">Bounce Diagram</a> ·
+  <a href="transformer.html">Transformer</a>
+</div>
+
+<script>
+const mainC = document.getElementById('mainCanvas');
+const c1C = document.getElementById('chart1');
+const c2C = document.getElementById('chart2');
+const mCtx = mainC.getContext('2d');
+const c1Ctx = c1C.getContext('2d');
+const c2Ctx = c2C.getContext('2d');
+
+let currentTab = 0;
+let time = 0, paused = false, lastTs = 0;
+
+// Tab data
+const equations = [
+  {
+    eq: '∇×E = −∂B/∂t  &  ∇×B = μ₀ε₀ ∂E/∂t',
+    name: 'Electromagnetic Wave (Faraday + Ampère–Maxwell combined)',
+    desc: 'A changing E field creates B, and a changing B field creates E — sustaining each other as a wave propagating at c.',
+    legend: [['#f97583','E field (electric)'],['#79c0ff','B field (magnetic)'],['#ffa657','Propagation →'],['#7ee787','Poynting vector S']],
+  },
+  {
+    eq: '∇·E = ρ / ε₀',
+    name: "Gauss's Law for Electric Fields",
+    desc: 'Electric field lines originate from positive charges and terminate on negative charges. The total flux through a closed surface equals the enclosed charge divided by ε₀.',
+    legend: [['#f97583','E field lines'],['#79c0ff','+ charge'],['#7ee787','− charge'],['#ffa657','Gaussian surface']],
+  },
+  {
+    eq: '∇·B = 0',
+    name: "Gauss's Law for Magnetism",
+    desc: 'There are no magnetic monopoles. Magnetic field lines always form closed loops — every field line that exits a surface must also enter it.',
+    legend: [['#79c0ff','B field lines'],['#d2a8ff','N pole (red)'],['#f97583','S pole (blue)'],['#ffa657','Gaussian surface']],
+  },
+  {
+    eq: '∇×E = −∂B/∂t',
+    name: "Faraday's Law of Induction",
+    desc: 'A changing magnetic field induces a circulating electric field. The induced EMF around a loop equals the negative rate of change of magnetic flux through the loop.',
+    legend: [['#f97583','Induced E field'],['#79c0ff','B field (changing)'],['#d2a8ff','Magnetic flux Φ'],['#7ee787','Induced EMF']],
+  },
+  {
+    eq: '∇×B = μ₀J + μ₀ε₀ ∂E/∂t',
+    name: 'Ampère–Maxwell Law',
+    desc: 'Electric currents AND changing electric fields create circulating magnetic fields. The displacement current term (∂E/∂t) was Maxwell\'s key addition.',
+    legend: [['#79c0ff','B field (circular)'],['#ffa657','Current I (wire)'],['#f97583','E field (changing)'],['#d2a8ff','Displacement current']],
+  },
+];
+
+// Controls per tab
+const tabControls = [
+  // EM wave
+  [{id:'freq',label:'Frequency',min:0.3,max:3,step:0.1,val:1,fmt:v=>v+' Hz'},
+   {id:'amp',label:'Amplitude',min:0.2,max:1,step:0.05,val:0.8,fmt:v=>(v*100|0)+'%'},
+   {id:'polar',label:'Polarization',min:0,max:180,step:5,val:0,fmt:v=>v+'°'},
+   {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'}],
+  // Gauss E
+  [{id:'q1',label:'Charge Q₁',min:-5,max:5,step:0.5,val:3,fmt:v=>(v>0?'+':'')+v},
+   {id:'q2',label:'Charge Q₂',min:-5,max:5,step:0.5,val:-2,fmt:v=>(v>0?'+':'')+v},
+   {id:'sep',label:'Separation',min:50,max:300,step:10,val:200,fmt:v=>v+'px'},
+   {id:'lines',label:'Field lines',min:8,max:32,step:2,val:16,fmt:v=>v}],
+  // Gauss B
+  [{id:'str',label:'Magnet strength',min:0.2,max:1,step:0.05,val:0.7,fmt:v=>(v*100|0)+'%'},
+   {id:'blines',label:'Field lines',min:6,max:24,step:2,val:12,fmt:v=>v},
+   {id:'gsz',label:'Surface size',min:60,max:200,step:10,val:120,fmt:v=>v+'px'},
+   {id:'rot',label:'Rotate',min:0,max:360,step:5,val:0,fmt:v=>v+'°'}],
+  // Faraday
+  [{id:'dBdt',label:'dB/dt rate',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'},
+   {id:'loopR',label:'Loop radius',min:40,max:150,step:5,val:90,fmt:v=>v+'px'},
+   {id:'bAmp',label:'B amplitude',min:0.3,max:1,step:0.05,val:0.7,fmt:v=>(v*100|0)+'%'},
+   {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'}],
+  // Ampere-Maxwell
+  [{id:'current',label:'Wire current',min:0,max:5,step:0.1,val:3,fmt:v=>v+' A'},
+   {id:'dEdt',label:'dE/dt (displacement)',min:0,max:3,step:0.1,val:0,fmt:v=>v},
+   {id:'rings',label:'B field rings',min:3,max:8,step:1,val:5,fmt:v=>v},
+   {id:'speed',label:'Speed',min:0.2,max:3,step:0.1,val:1,fmt:v=>v+'x'}],
+];
+
+let ctrls = {};
+
+function buildControls(tabIdx) {
+  const box = document.getElementById('ctrlBox');
+  box.innerHTML = '';
+  ctrls = {};
+  tabControls[tabIdx].forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'cg';
+    const lbl = document.createElement('label');
+    lbl.textContent = c.label + ':';
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = c.val;
+    const sp = document.createElement('span');
+    sp.className = 'val'; sp.textContent = c.fmt(c.val);
+    inp.oninput = () => sp.textContent = c.fmt(inp.value);
+    div.append(lbl, inp, sp);
+    box.appendChild(div);
+    ctrls[c.id] = inp;
+  });
+  // Pause & Reset
+  const pb = document.createElement('button');
+  pb.textContent = paused ? 'Play' : 'Pause';
+  pb.onclick = () => { paused = !paused; pb.textContent = paused ? 'Play' : 'Pause'; };
+  const rb = document.createElement('button');
+  rb.className = 'sec'; rb.textContent = 'Reset';
+  rb.onclick = () => { time = 0; paused = false; pb.textContent = 'Pause'; };
+  box.append(pb, rb);
+}
+
+function switchTab(idx) {
+  currentTab = idx;
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  const e = equations[idx];
+  document.getElementById('eqText').innerHTML = e.eq;
+  document.getElementById('eqName').textContent = e.name;
+  document.getElementById('eqDesc').textContent = e.desc;
+  const lb = document.getElementById('legendBox');
+  lb.innerHTML = '';
+  e.legend.forEach(([c, l]) => {
+    lb.innerHTML += `<div class="legend-item"><div class="legend-dot" style="background:${c}"></div> ${l}</div>`;
+  });
+  buildControls(idx);
+  time = 0;
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => switchTab(parseInt(t.dataset.tab));
+});
+
+function cv(id) { return parseFloat(ctrls[id]?.value || 0); }
+
+/* ========== TAB 0: EM WAVE ========== */
+function drawEMWave() {
+  const W = mainC.width, H = mainC.height;
+  const cx = W / 2, cy = H / 2;
+  const freq = cv('freq'), amp = cv('amp'), pol = cv('polar') * Math.PI / 180, spd = cv('speed');
+  const waveLen = 300;
+  const k = 2 * Math.PI / waveLen;
+  const omega = 2 * Math.PI * freq;
+
+  mCtx.clearRect(0, 0, W, H);
+
+  // Propagation axis
+  mCtx.strokeStyle = '#ffffff15';
+  mCtx.lineWidth = 1;
+  mCtx.setLineDash([6, 6]);
+  mCtx.beginPath(); mCtx.moveTo(40, cy); mCtx.lineTo(W - 40, cy); mCtx.stroke();
+  mCtx.setLineDash([]);
+
+  // Axis labels
+  mCtx.fillStyle = '#484f58';
+  mCtx.font = '11px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('z (propagation direction) →', cx, H - 8);
+  mCtx.save();
+  mCtx.translate(15, cy);
+  mCtx.rotate(-Math.PI / 2);
+  mCtx.fillText('E (vertical)', 0, 0);
+  mCtx.restore();
+  mCtx.fillText('B (horizontal) ⊙/⊗', cx, 22);
+
+  const startX = 60, endX = W - 60;
+  const eScale = (H / 2 - 50) * amp;
+  const bScale = eScale * 0.7;
+  const phase = omega * time * spd;
+
+  // E field (vertical oscillation)
+  mCtx.strokeStyle = '#f97583';
+  mCtx.lineWidth = 2.5;
+  mCtx.shadowColor = '#f97583';
+  mCtx.shadowBlur = 6;
+  mCtx.beginPath();
+  for (let x = startX; x <= endX; x += 2) {
+    const z = x - startX;
+    const E = Math.sin(k * z - phase) * eScale * Math.cos(pol);
+    const px = x;
+    const py = cy - E;
+    x === startX ? mCtx.moveTo(px, py) : mCtx.lineTo(px, py);
+  }
+  mCtx.stroke();
+  mCtx.shadowBlur = 0;
+
+  // E field vectors (arrows from axis)
+  const arrowSpacing = 25;
+  for (let x = startX; x <= endX; x += arrowSpacing) {
+    const z = x - startX;
+    const E = Math.sin(k * z - phase) * eScale * Math.cos(pol);
+    if (Math.abs(E) < 3) continue;
+    mCtx.strokeStyle = '#f9758360';
+    mCtx.lineWidth = 1;
+    mCtx.beginPath();
+    mCtx.moveTo(x, cy);
+    mCtx.lineTo(x, cy - E);
+    mCtx.stroke();
+    // Arrowhead
+    const dir = E > 0 ? -1 : 1;
+    mCtx.fillStyle = '#f9758360';
+    mCtx.beginPath();
+    mCtx.moveTo(x, cy - E);
+    mCtx.lineTo(x - 3, cy - E + 6 * dir);
+    mCtx.lineTo(x + 3, cy - E + 6 * dir);
+    mCtx.closePath();
+    mCtx.fill();
+  }
+
+  // B field (horizontal/depth — shown as perpendicular to E)
+  mCtx.strokeStyle = '#79c0ff';
+  mCtx.lineWidth = 2.5;
+  mCtx.shadowColor = '#79c0ff';
+  mCtx.shadowBlur = 6;
+  mCtx.beginPath();
+  for (let x = startX; x <= endX; x += 2) {
+    const z = x - startX;
+    const B = Math.sin(k * z - phase) * bScale;
+    // Draw B as horizontal displacement (perspective)
+    const px = x + B * 0.3;
+    const py = cy + B * 0.15; // slight perspective
+    x === startX ? mCtx.moveTo(px, py) : mCtx.lineTo(px, py);
+  }
+  mCtx.stroke();
+  mCtx.shadowBlur = 0;
+
+  // B field vectors
+  for (let x = startX; x <= endX; x += arrowSpacing) {
+    const z = x - startX;
+    const B = Math.sin(k * z - phase) * bScale;
+    if (Math.abs(B) < 3) continue;
+    mCtx.strokeStyle = '#79c0ff40';
+    mCtx.lineWidth = 1;
+    mCtx.beginPath();
+    mCtx.moveTo(x, cy);
+    mCtx.lineTo(x + B * 0.3, cy + B * 0.15);
+    mCtx.stroke();
+  }
+
+  // Poynting vector (energy flow)
+  const arrowX = endX - 30;
+  const S = amp * amp * 0.5;
+  mCtx.fillStyle = `rgba(126,231,135,${Math.min(0.8, S)})`;
+  mCtx.font = 'bold 12px sans-serif';
+  mCtx.textAlign = 'right';
+  mCtx.fillText('S = E × B →', arrowX, cy + eScale + 30);
+
+  // Moving wavefront indicator
+  const wfX = startX + ((phase / k) % (endX - startX));
+  mCtx.strokeStyle = '#ffa65730';
+  mCtx.lineWidth = 2;
+  mCtx.setLineDash([3, 5]);
+  mCtx.beginPath();
+  mCtx.moveTo(wfX, cy - eScale - 10);
+  mCtx.lineTo(wfX, cy + eScale + 10);
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+
+  // Wavelength annotation
+  const lx = startX + 10;
+  const ly = cy + eScale + 45;
+  mCtx.strokeStyle = '#8b949e';
+  mCtx.lineWidth = 1;
+  mCtx.beginPath();
+  mCtx.moveTo(lx, ly); mCtx.lineTo(lx + waveLen, ly); mCtx.stroke();
+  mCtx.beginPath(); mCtx.moveTo(lx, ly - 5); mCtx.lineTo(lx, ly + 5); mCtx.stroke();
+  mCtx.beginPath(); mCtx.moveTo(lx + waveLen, ly - 5); mCtx.lineTo(lx + waveLen, ly + 5); mCtx.stroke();
+  mCtx.fillStyle = '#8b949e';
+  mCtx.font = '11px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('λ (wavelength)', lx + waveLen / 2, ly + 15);
+
+  // c = fλ label
+  mCtx.fillStyle = '#ffa657';
+  mCtx.font = 'bold 12px sans-serif';
+  mCtx.textAlign = 'left';
+  mCtx.fillText('c = f·λ = 1/√(μ₀ε₀) ≈ 3×10⁸ m/s', 60, 50);
+
+  // Charts
+  drawEMCharts(freq, amp, phase, k, startX, endX);
+}
+
+function drawEMCharts(freq, amp, phase, k, startX, endX) {
+  // Chart 1: E and B amplitude at a fixed point
+  [c1Ctx, c2Ctx].forEach(ctx => {
+    const c = ctx === c1Ctx ? c1C : c2C;
+    const W = c.width, H = c.height;
+    const pad = { l: 40, r: 10, t: 10, b: 20 };
+    const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = '#ffffff10';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.t + (i / 4) * pH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pW, y); ctx.stroke();
+    }
+    const midY = pad.t + pH / 2;
+    ctx.strokeStyle = '#ffffff20';
+    ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(pad.l + pW, midY); ctx.stroke();
+  });
+
+  // Chart 1: Field snapshot along z
+  const W1 = c1C.width, H1 = c1C.height;
+  const pad = { l: 40, r: 10, t: 10, b: 20 };
+  const pW = W1 - pad.l - pad.r, pH = H1 - pad.t - pad.b;
+  const midY = pad.t + pH / 2;
+  const scale = pH / 2 * 0.85;
+
+  document.getElementById('chart1Title').textContent = 'Field at fixed point vs time';
+
+  // E at z=0 over time
+  const maxT = 4 / freq;
+  const steps = 300;
+  [{ fn: t => Math.sin(-2 * Math.PI * freq * t) * amp, color: '#f97583', label: 'E(t)' },
+   { fn: t => Math.sin(-2 * Math.PI * freq * t) * amp * 0.7, color: '#79c0ff', label: 'B(t)' }
+  ].forEach(({ fn, color, label }) => {
+    c1Ctx.strokeStyle = color;
+    c1Ctx.lineWidth = 2;
+    c1Ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * maxT;
+      const v = fn(t + time * cv('speed'));
+      const x = pad.l + (i / steps) * pW;
+      const y = midY - v * scale;
+      i === 0 ? c1Ctx.moveTo(x, y) : c1Ctx.lineTo(x, y);
+    }
+    c1Ctx.stroke();
+    c1Ctx.fillStyle = color;
+    c1Ctx.font = 'bold 10px sans-serif';
+    c1Ctx.textAlign = 'left';
+    c1Ctx.fillText(label, pad.l + pW + 2, midY);
+  });
+
+  // Chart 2: Energy density
+  document.getElementById('chart2Title').textContent = 'Energy density u = ½ε₀E² + ½B²/μ₀';
+  const W2 = c2C.width, H2 = c2C.height;
+  const midY2 = pad.t + pH / 2;
+
+  [{ fn: t => 0.5 * Math.pow(Math.sin(-2 * Math.PI * freq * t) * amp, 2), color: '#f97583', label: 'u_E' },
+   { fn: t => 0.5 * Math.pow(Math.sin(-2 * Math.PI * freq * t) * amp * 0.7, 2), color: '#79c0ff', label: 'u_B' },
+   { fn: t => 0.5 * Math.pow(Math.sin(-2 * Math.PI * freq * t) * amp, 2) +
+              0.5 * Math.pow(Math.sin(-2 * Math.PI * freq * t) * amp * 0.7, 2), color: '#7ee787', label: 'u_total' },
+  ].forEach(({ fn, color, label }) => {
+    c2Ctx.strokeStyle = color;
+    c2Ctx.lineWidth = label === 'u_total' ? 2 : 1.5;
+    if (label !== 'u_total') c2Ctx.setLineDash([4, 4]);
+    c2Ctx.beginPath();
+    const base = pad.t + pH - 5;
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * maxT;
+      const v = fn(t + time * cv('speed'));
+      const x = pad.l + (i / steps) * pW;
+      const y = base - v * pH * 1.5;
+      i === 0 ? c2Ctx.moveTo(x, y) : c2Ctx.lineTo(x, y);
+    }
+    c2Ctx.stroke();
+    c2Ctx.setLineDash([]);
+  });
+}
+
+/* ========== TAB 1: GAUSS E ========== */
+function drawGaussE() {
+  const W = mainC.width, H = mainC.height;
+  const cx = W / 2, cy = H / 2;
+  mCtx.clearRect(0, 0, W, H);
+
+  const q1 = cv('q1'), q2 = cv('q2');
+  const sep = cv('sep');
+  const nLines = cv('lines');
+
+  const charges = [];
+  if (q1 !== 0) charges.push({ x: cx - sep / 2, y: cy, q: q1 });
+  if (q2 !== 0) charges.push({ x: cx + sep / 2, y: cy, q: q2 });
+
+  // Draw Gaussian surface
+  mCtx.strokeStyle = '#ffa65740';
+  mCtx.lineWidth = 2;
+  mCtx.setLineDash([8, 6]);
+  mCtx.beginPath();
+  mCtx.ellipse(cx, cy, sep * 0.8, sep * 0.6, 0, 0, Math.PI * 2);
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+  mCtx.fillStyle = '#ffa65710';
+  mCtx.fill();
+
+  // Flux text
+  const totalQ = charges.reduce((s, c) => s + c.q, 0);
+  mCtx.fillStyle = '#ffa657';
+  mCtx.font = 'bold 12px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText(`∮E·dA = Q_enc/ε₀   (Q_enc = ${totalQ.toFixed(1)})`, cx, 35);
+
+  // Compute E field at a point
+  function eField(px, py) {
+    let ex = 0, ey = 0;
+    charges.forEach(c => {
+      const dx = px - c.x, dy = py - c.y;
+      const r2 = dx * dx + dy * dy;
+      const r = Math.sqrt(r2);
+      if (r < 5) return;
+      const E = c.q / r2 * 5000;
+      ex += E * dx / r;
+      ey += E * dy / r;
+    });
+    return [ex, ey];
+  }
+
+  // Draw field lines from positive charges
+  charges.forEach(c => {
+    if (c.q === 0) return;
+    const n = Math.round(Math.abs(c.q) / 5 * nLines);
+    const dir = c.q > 0 ? 1 : -1;
+    for (let i = 0; i < n; i++) {
+      const angle = (i / n) * Math.PI * 2 + time * 0.3;
+      let px = c.x + Math.cos(angle) * 12 * dir;
+      let py = c.y + Math.sin(angle) * 12 * dir;
+
+      mCtx.strokeStyle = '#f9758380';
+      mCtx.lineWidth = 1.5;
+      mCtx.beginPath();
+      mCtx.moveTo(px, py);
+
+      for (let step = 0; step < 200; step++) {
+        const [ex, ey] = eField(px, py);
+        const mag = Math.sqrt(ex * ex + ey * ey);
+        if (mag < 0.01) break;
+        const ds = 3;
+        px += (ex / mag) * ds * dir;
+        py += (ey / mag) * ds * dir;
+        if (px < 10 || px > W - 10 || py < 10 || py > H - 10) break;
+
+        // Stop if near opposite charge
+        let nearCharge = false;
+        charges.forEach(c2 => {
+          if (c2.q * c.q < 0 && Math.hypot(px - c2.x, py - c2.y) < 10) nearCharge = true;
+        });
+        if (nearCharge) { mCtx.lineTo(px, py); break; }
+        mCtx.lineTo(px, py);
+      }
+      mCtx.stroke();
+
+      // Arrow at midpoint
+      const [emx, emy] = eField(c.x + Math.cos(angle) * 60 * dir, c.y + Math.sin(angle) * 60 * dir);
+      const emag = Math.sqrt(emx * emx + emy * emy);
+      if (emag > 0.1) {
+        const ax = c.x + Math.cos(angle) * 60 * dir;
+        const ay = c.y + Math.sin(angle) * 60 * dir;
+        const aDir = dir;
+        mCtx.fillStyle = '#f97583';
+        const a2 = Math.atan2(emy * aDir, emx * aDir);
+        mCtx.beginPath();
+        mCtx.moveTo(ax + Math.cos(a2) * 6, ay + Math.sin(a2) * 6);
+        mCtx.lineTo(ax + Math.cos(a2 + 2.5) * 5, ay + Math.sin(a2 + 2.5) * 5);
+        mCtx.lineTo(ax + Math.cos(a2 - 2.5) * 5, ay + Math.sin(a2 - 2.5) * 5);
+        mCtx.closePath();
+        mCtx.fill();
+      }
+    }
+  });
+
+  // Draw charges
+  charges.forEach(c => {
+    const color = c.q > 0 ? '#79c0ff' : '#7ee787';
+    const glow = Math.min(1, Math.abs(c.q) * 0.25);
+    const grd = mCtx.createRadialGradient(c.x, c.y, 5, c.x, c.y, 40);
+    grd.addColorStop(0, color + Math.round(glow * 60).toString(16).padStart(2, '0'));
+    grd.addColorStop(1, color + '00');
+    mCtx.fillStyle = grd;
+    mCtx.fillRect(c.x - 40, c.y - 40, 80, 80);
+
+    mCtx.beginPath();
+    mCtx.arc(c.x, c.y, 14, 0, Math.PI * 2);
+    mCtx.fillStyle = color;
+    mCtx.fill();
+    mCtx.strokeStyle = '#0d1117';
+    mCtx.lineWidth = 2;
+    mCtx.stroke();
+
+    mCtx.fillStyle = '#0d1117';
+    mCtx.font = 'bold 16px sans-serif';
+    mCtx.textAlign = 'center';
+    mCtx.textBaseline = 'middle';
+    mCtx.fillText(c.q > 0 ? '+' : '−', c.x, c.y);
+    mCtx.textBaseline = 'alphabetic';
+
+    mCtx.fillStyle = color;
+    mCtx.font = '11px sans-serif';
+    mCtx.fillText('q=' + (c.q > 0 ? '+' : '') + c.q.toFixed(1), c.x, c.y + 28);
+  });
+
+  // Charts: E field magnitude along x-axis
+  document.getElementById('chart1Title').textContent = 'E field magnitude along x-axis';
+  document.getElementById('chart2Title').textContent = 'Electric potential along x-axis';
+  drawFieldChart(c1Ctx, c1C, x => {
+    const [ex, ey] = eField(x, cy);
+    return Math.sqrt(ex * ex + ey * ey);
+  }, '#f97583', '|E|', false);
+  drawFieldChart(c2Ctx, c2C, x => {
+    let V = 0;
+    charges.forEach(c => {
+      const r = Math.max(15, Math.hypot(x - c.x, cy - c.y));
+      V += c.q * 70 / r;
+    });
+    return V;
+  }, '#d2a8ff', 'V', true);
+}
+
+function drawFieldChart(ctx, canvas, fn, color, label, centered) {
+  const W = canvas.width, H = canvas.height;
+  const pad = { l: 40, r: 10, t: 10, b: 20 };
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#ffffff10';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * pH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pW, y); ctx.stroke();
+  }
+
+  const samples = [];
+  for (let i = 0; i <= 200; i++) {
+    const x = 30 + (i / 200) * (mainC.width - 60);
+    samples.push(fn(x));
+  }
+
+  let maxVal = Math.max(0.1, ...samples.map(Math.abs));
+  const baseY = centered ? pad.t + pH / 2 : pad.t + pH - 5;
+
+  if (centered) {
+    ctx.strokeStyle = '#ffffff20';
+    ctx.beginPath(); ctx.moveTo(pad.l, baseY); ctx.lineTo(pad.l + pW, baseY); ctx.stroke();
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  samples.forEach((v, i) => {
+    const x = pad.l + (i / 200) * pW;
+    const y = centered ? baseY - (v / maxVal) * (pH / 2 * 0.85) : baseY - (v / maxVal) * pH * 0.85;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(label, pad.l + pW + 2, pad.t + 15);
+}
+
+/* ========== TAB 2: GAUSS B ========== */
+function drawGaussB() {
+  const W = mainC.width, H = mainC.height;
+  const cx = W / 2, cy = H / 2;
+  mCtx.clearRect(0, 0, W, H);
+
+  const str = cv('str');
+  const nLines = cv('blines');
+  const gsz = cv('gsz');
+  const rot = cv('rot') * Math.PI / 180;
+
+  // Bar magnet
+  const magW = 160, magH = 50;
+
+  mCtx.save();
+  mCtx.translate(cx, cy);
+  mCtx.rotate(rot);
+
+  // Magnet body
+  // N pole (red)
+  mCtx.fillStyle = '#da3633';
+  mCtx.beginPath();
+  mCtx.roundRect(-magW / 2, -magH / 2, magW / 2, magH, [8, 0, 0, 8]);
+  mCtx.fill();
+  mCtx.fillStyle = 'white';
+  mCtx.font = 'bold 18px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.textBaseline = 'middle';
+  mCtx.fillText('N', -magW / 4, 0);
+
+  // S pole (blue)
+  mCtx.fillStyle = '#1f6feb';
+  mCtx.beginPath();
+  mCtx.roundRect(0, -magH / 2, magW / 2, magH, [0, 8, 8, 0]);
+  mCtx.fill();
+  mCtx.fillStyle = 'white';
+  mCtx.fillText('S', magW / 4, 0);
+  mCtx.textBaseline = 'alphabetic';
+
+  // Field lines (closed loops)
+  for (let i = 0; i < nLines; i++) {
+    const frac = (i + 1) / (nLines + 1);
+    const spread = 30 + frac * 150 * str;
+    const lenScale = 0.6 + frac * 1.2;
+
+    mCtx.strokeStyle = `rgba(121,192,255,${0.3 + (1 - frac) * 0.4})`;
+    mCtx.lineWidth = 1.5;
+    mCtx.beginPath();
+
+    // Parametric closed loop
+    const pts = 100;
+    for (let j = 0; j <= pts; j++) {
+      const t = (j / pts) * Math.PI * 2;
+      // Dipole field line: r = r0 * sin²(θ)
+      const r0 = spread;
+      const x = r0 * lenScale * Math.cos(t);
+      const y = r0 * Math.sin(t) * 0.8;
+      j === 0 ? mCtx.moveTo(x, y) : mCtx.lineTo(x, y);
+    }
+    mCtx.stroke();
+
+    // Arrow dots showing direction (N to S outside, S to N inside)
+    const dotPhase = ((time * 1.5 + i * 0.3) % 1);
+    const dt = dotPhase * Math.PI * 2;
+    const dx = spread * lenScale * Math.cos(dt);
+    const dy = spread * Math.sin(dt) * 0.8;
+    mCtx.beginPath();
+    mCtx.arc(dx, dy, 3, 0, Math.PI * 2);
+    mCtx.fillStyle = '#79c0ff';
+    mCtx.fill();
+  }
+
+  mCtx.restore();
+
+  // Gaussian surface
+  mCtx.strokeStyle = '#ffa65750';
+  mCtx.lineWidth = 2;
+  mCtx.setLineDash([6, 5]);
+  mCtx.beginPath();
+  mCtx.ellipse(cx, cy, gsz, gsz * 0.75, 0, 0, Math.PI * 2);
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+  mCtx.fillStyle = '#ffa65708';
+  mCtx.fill();
+
+  // Net flux = 0 label
+  mCtx.fillStyle = '#ffa657';
+  mCtx.font = 'bold 13px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('∮B·dA = 0   (always!)', cx, 35);
+  mCtx.fillStyle = '#8b949e';
+  mCtx.font = '11px sans-serif';
+  mCtx.fillText('Every field line entering the surface also exits — no magnetic monopoles', cx, 52);
+
+  // Arrows showing flux in = flux out
+  const gRight = cx + gsz + 15;
+  const gLeft = cx - gsz - 15;
+  mCtx.fillStyle = '#7ee787';
+  mCtx.font = '11px sans-serif';
+  mCtx.textAlign = 'left';
+  mCtx.fillText('Φ_out', gRight, cy - 20);
+  mCtx.textAlign = 'right';
+  mCtx.fillText('Φ_in', gLeft, cy - 20);
+  mCtx.fillStyle = '#f97583';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('Φ_in + Φ_out = 0', cx, H - 20);
+
+  // Charts
+  document.getElementById('chart1Title').textContent = 'B field magnitude along x-axis';
+  document.getElementById('chart2Title').textContent = 'Flux through surface vs size';
+
+  drawFieldChart(c1Ctx, c1C, x => {
+    const dx = x - cx;
+    const r = Math.max(20, Math.abs(dx));
+    return str * 5000 / (r * r) * (dx > 0 ? 1 : -1);
+  }, '#79c0ff', 'Bx', true);
+
+  // Flux chart: always sums to 0
+  const W2 = c2C.width, H2 = c2C.height;
+  const pad = { l: 40, r: 10, t: 10, b: 20 };
+  const pW2 = W2 - pad.l - pad.r, pH2 = H2 - pad.t - pad.b;
+  c2Ctx.clearRect(0, 0, W2, H2);
+
+  c2Ctx.strokeStyle = '#ffffff20';
+  const midY = pad.t + pH2 / 2;
+  c2Ctx.beginPath(); c2Ctx.moveTo(pad.l, midY); c2Ctx.lineTo(pad.l + pW2, midY); c2Ctx.stroke();
+
+  // Show Φ_in and Φ_out as functions of surface size, always summing to 0
+  for (let pass = 0; pass < 3; pass++) {
+    const color = pass === 0 ? '#7ee787' : pass === 1 ? '#f97583' : '#ffa657';
+    const label = pass === 0 ? 'Φ_out' : pass === 1 ? 'Φ_in' : 'Φ_net = 0';
+    c2Ctx.strokeStyle = color;
+    c2Ctx.lineWidth = pass === 2 ? 2.5 : 1.5;
+    if (pass < 2) c2Ctx.setLineDash([4, 4]);
+    c2Ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const sz = 40 + (i / 200) * 250;
+      const val = pass === 0 ? str * Math.min(1, 80 / sz) : pass === 1 ? -str * Math.min(1, 80 / sz) : 0;
+      const x = pad.l + (i / 200) * pW2;
+      const y = midY - val * pH2 * 0.4;
+      i === 0 ? c2Ctx.moveTo(x, y) : c2Ctx.lineTo(x, y);
+    }
+    c2Ctx.stroke();
+    c2Ctx.setLineDash([]);
+    c2Ctx.fillStyle = color;
+    c2Ctx.font = 'bold 10px sans-serif';
+    c2Ctx.textAlign = 'left';
+    c2Ctx.fillText(label, pad.l + pW2 + 2, midY + (pass - 1) * 15);
+  }
+}
+
+/* ========== TAB 3: FARADAY ========== */
+function drawFaraday() {
+  const W = mainC.width, H = mainC.height;
+  const cx = W / 2, cy = H / 2;
+  mCtx.clearRect(0, 0, W, H);
+
+  const dBdt = cv('dBdt');
+  const loopR = cv('loopR');
+  const bAmp = cv('bAmp');
+  const spd = cv('speed');
+
+  const B = bAmp * Math.sin(2 * Math.PI * 0.5 * time * spd * dBdt);
+  const dB = bAmp * Math.cos(2 * Math.PI * 0.5 * time * spd * dBdt) * 2 * Math.PI * 0.5 * dBdt;
+  const EMF = -dB * (loopR / 90) * (loopR / 90); // proportional to area
+
+  // B field region (into/out of page)
+  const bAlpha = Math.min(0.5, Math.abs(B) * 0.6);
+  const bDir = B > 0;
+  mCtx.fillStyle = `rgba(121,192,255,${bAlpha * 0.15})`;
+  mCtx.fillRect(cx - 180, cy - 180, 360, 360);
+
+  // B field symbols (dots or crosses)
+  const spacing = 35;
+  for (let gx = cx - 175; gx <= cx + 175; gx += spacing) {
+    for (let gy = cy - 175; gy <= cy + 175; gy += spacing) {
+      const r = Math.hypot(gx - cx, gy - cy);
+      if (r > 185) continue;
+      const sz = Math.min(6, Math.abs(B) * 8);
+      if (sz < 0.5) continue;
+      mCtx.fillStyle = `rgba(121,192,255,${bAlpha})`;
+      mCtx.strokeStyle = `rgba(121,192,255,${bAlpha})`;
+      mCtx.lineWidth = 1.5;
+      if (bDir) {
+        // Dot (out of page)
+        mCtx.beginPath();
+        mCtx.arc(gx, gy, sz, 0, Math.PI * 2);
+        mCtx.fill();
+      } else {
+        // Cross (into page)
+        mCtx.beginPath();
+        mCtx.moveTo(gx - sz, gy - sz); mCtx.lineTo(gx + sz, gy + sz);
+        mCtx.moveTo(gx + sz, gy - sz); mCtx.lineTo(gx - sz, gy + sz);
+        mCtx.stroke();
+      }
+    }
+  }
+
+  // B label
+  mCtx.fillStyle = '#79c0ff';
+  mCtx.font = 'bold 13px sans-serif';
+  mCtx.textAlign = 'left';
+  mCtx.fillText('B = ' + B.toFixed(2) + (bDir ? ' ⊙ (out)' : ' ⊗ (in)'), cx + 195, cy - 160);
+  mCtx.fillText('dB/dt = ' + dB.toFixed(2), cx + 195, cy - 140);
+
+  // Conducting loop
+  mCtx.strokeStyle = '#8b949e';
+  mCtx.lineWidth = 3;
+  mCtx.beginPath();
+  mCtx.arc(cx, cy, loopR, 0, Math.PI * 2);
+  mCtx.stroke();
+
+  // Induced E field (circulating around loop)
+  const emfAlpha = Math.min(0.9, Math.abs(EMF) * 1.5);
+  if (emfAlpha > 0.02) {
+    const eDir = EMF > 0 ? 1 : -1;
+    const nArrows = 12;
+    for (let i = 0; i < nArrows; i++) {
+      const angle = (i / nArrows) * Math.PI * 2 + time * spd * 2 * eDir;
+      const ax = cx + Math.cos(angle) * loopR;
+      const ay = cy + Math.sin(angle) * loopR;
+
+      // Tangent direction
+      const tx = -Math.sin(angle) * eDir;
+      const ty = Math.cos(angle) * eDir;
+
+      mCtx.fillStyle = `rgba(249,117,131,${emfAlpha})`;
+      mCtx.beginPath();
+      mCtx.moveTo(ax + tx * 10, ay + ty * 10);
+      mCtx.lineTo(ax + tx * 2 - ty * 4, ay + ty * 2 + tx * 4);
+      mCtx.lineTo(ax + tx * 2 + ty * 4, ay + ty * 2 - tx * 4);
+      mCtx.closePath();
+      mCtx.fill();
+    }
+
+    // Glow on loop
+    mCtx.strokeStyle = `rgba(249,117,131,${emfAlpha * 0.6})`;
+    mCtx.lineWidth = 5;
+    mCtx.shadowColor = '#f97583';
+    mCtx.shadowBlur = emfAlpha * 15;
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, loopR, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.shadowBlur = 0;
+  }
+
+  // Labels
+  mCtx.fillStyle = '#f97583';
+  mCtx.font = 'bold 13px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('EMF = −dΦ/dt = ' + EMF.toFixed(3), cx, cy + loopR + 35);
+  mCtx.fillStyle = '#d2a8ff';
+  mCtx.fillText('Φ = B · A = ' + (B * (loopR / 90) * (loopR / 90)).toFixed(3), cx, cy + loopR + 55);
+  mCtx.fillStyle = '#8b949e';
+  mCtx.font = '11px sans-serif';
+  mCtx.fillText('Induced E field circulates ' + (EMF > 0.01 ? 'CCW' : EMF < -0.01 ? 'CW' : '(none)'), cx, cy + loopR + 75);
+
+  // Equation
+  mCtx.fillStyle = '#ffa657';
+  mCtx.font = 'bold 12px sans-serif';
+  mCtx.fillText('∮E·dl = −dΦ_B/dt', cx, 30);
+
+  // Charts
+  document.getElementById('chart1Title').textContent = 'B field & Flux vs time';
+  document.getElementById('chart2Title').textContent = 'Induced EMF vs time';
+  drawTimeTrace(c1Ctx, c1C, [
+    { fn: t => bAmp * Math.sin(2 * Math.PI * 0.5 * t * dBdt), color: '#79c0ff', label: 'B(t)' },
+    { fn: t => bAmp * Math.sin(2 * Math.PI * 0.5 * t * dBdt) * (loopR / 90) * (loopR / 90), color: '#d2a8ff', label: 'Φ(t)' },
+  ], spd);
+  drawTimeTrace(c2Ctx, c2C, [
+    { fn: t => {
+      const d = bAmp * Math.cos(2 * Math.PI * 0.5 * t * dBdt) * 2 * Math.PI * 0.5 * dBdt;
+      return -d * (loopR / 90) * (loopR / 90);
+    }, color: '#f97583', label: 'EMF(t)' },
+  ], spd);
+}
+
+function drawTimeTrace(ctx, canvas, traces, spd) {
+  const W = canvas.width, H = canvas.height;
+  const pad = { l: 40, r: 10, t: 10, b: 20 };
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#ffffff10';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * pH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pW, y); ctx.stroke();
+  }
+  const midY = pad.t + pH / 2;
+  ctx.strokeStyle = '#ffffff20';
+  ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(pad.l + pW, midY); ctx.stroke();
+
+  let maxV = 0.1;
+  const window = 6;
+  traces.forEach(tr => {
+    for (let i = 0; i <= 200; i++) {
+      const t = time * spd - window + (i / 200) * window;
+      maxV = Math.max(maxV, Math.abs(tr.fn(t)));
+    }
+  });
+
+  // Time cursor
+  const cursorX = pad.l + pW;
+  ctx.strokeStyle = '#ffffff15';
+  ctx.beginPath(); ctx.moveTo(cursorX, pad.t); ctx.lineTo(cursorX, pad.t + pH); ctx.stroke();
+
+  traces.forEach(({ fn, color, label }) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = time * spd - window + (i / 200) * window;
+      const v = fn(t);
+      const x = pad.l + (i / 200) * pW;
+      const y = midY - (v / maxV) * (pH / 2 * 0.85);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, pad.l + 5, pad.t + 12 + traces.indexOf(arguments[0]) * 13);
+  });
+  // Fix label positions
+  let ly = pad.t + 12;
+  traces.forEach(({ color, label }) => {
+    ctx.fillStyle = color;
+    ctx.fillText(label, pad.l + pW + 2, ly);
+    ly += 14;
+  });
+}
+
+/* ========== TAB 4: AMPERE-MAXWELL ========== */
+function drawAmpere() {
+  const W = mainC.width, H = mainC.height;
+  const cx = W / 2, cy = H / 2;
+  mCtx.clearRect(0, 0, W, H);
+
+  const I = cv('current');
+  const dEdt = cv('dEdt');
+  const nRings = cv('rings');
+  const spd = cv('speed');
+
+  // Wire (vertical, current flowing up)
+  mCtx.strokeStyle = '#ffa657';
+  mCtx.lineWidth = 6;
+  mCtx.shadowColor = '#ffa657';
+  mCtx.shadowBlur = I * 3;
+  mCtx.beginPath();
+  mCtx.moveTo(cx, H - 20);
+  mCtx.lineTo(cx, 20);
+  mCtx.stroke();
+  mCtx.shadowBlur = 0;
+
+  // Current direction arrow
+  if (I > 0.1) {
+    mCtx.fillStyle = '#ffa657';
+    mCtx.beginPath();
+    mCtx.moveTo(cx, 30);
+    mCtx.lineTo(cx - 8, 50);
+    mCtx.lineTo(cx + 8, 50);
+    mCtx.closePath();
+    mCtx.fill();
+    mCtx.font = 'bold 13px sans-serif';
+    mCtx.textAlign = 'left';
+    mCtx.fillText('I = ' + I.toFixed(1) + ' A ↑', cx + 12, 40);
+  }
+
+  // Current dots flowing up in wire
+  if (I > 0.1) {
+    const dotSpeed = time * spd * 80 * I / 3;
+    for (let d = 0; d < 8; d++) {
+      const y = ((H - 40 - (dotSpeed + d * (H - 40) / 8)) % (H - 40) + H - 40) % (H - 40) + 20;
+      mCtx.beginPath();
+      mCtx.arc(cx, y, 3, 0, Math.PI * 2);
+      mCtx.fillStyle = '#ffcc00';
+      mCtx.fill();
+    }
+  }
+
+  // B field rings (concentric circles around wire)
+  const maxR = 200;
+  for (let i = 1; i <= nRings; i++) {
+    const r = (i / nRings) * maxR;
+    const bMag = I / (r / 40); // B ∝ I/r
+    const alpha = Math.min(0.6, bMag * 0.15);
+    if (alpha < 0.02) continue;
+
+    // Ring
+    mCtx.strokeStyle = `rgba(121,192,255,${alpha})`;
+    mCtx.lineWidth = 2;
+    mCtx.setLineDash([]);
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    mCtx.stroke();
+
+    // Direction arrows on ring (right-hand rule: CCW when looking down at I going up)
+    const nArrows = Math.max(4, Math.round(r / 25));
+    for (let a = 0; a < nArrows; a++) {
+      const angle = (a / nArrows) * Math.PI * 2 + time * spd * 1.5;
+      const ax = cx + Math.cos(angle) * r;
+      const ay = cy + Math.sin(angle) * r;
+      // Tangent (CCW)
+      const tx = Math.sin(angle);
+      const ty = -Math.cos(angle);
+
+      mCtx.fillStyle = `rgba(121,192,255,${alpha})`;
+      mCtx.beginPath();
+      mCtx.moveTo(ax + tx * 7, ay + ty * 7);
+      mCtx.lineTo(ax + tx * 0 - ty * 4, ay + ty * 0 + tx * 4);
+      mCtx.lineTo(ax + tx * 0 + ty * 4, ay + ty * 0 - tx * 4);
+      mCtx.closePath();
+      mCtx.fill();
+    }
+
+    // B magnitude label on first ring
+    if (i === 1) {
+      mCtx.fillStyle = '#79c0ff';
+      mCtx.font = '11px sans-serif';
+      mCtx.textAlign = 'left';
+      mCtx.fillText('B = μ₀I/(2πr)', cx + r + 8, cy - 5);
+    }
+  }
+
+  // Displacement current visualization (if enabled)
+  if (dEdt > 0.1) {
+    const dAlpha = Math.min(0.5, dEdt * 0.2);
+    // Show changing E field as vertical arrows near wire
+    const ePhase = time * spd * 3;
+    const eStr = dEdt * Math.sin(ePhase);
+    for (let gy = cy - 140; gy <= cy + 140; gy += 30) {
+      for (let gx = cx - 100; gx <= cx + 100; gx += 40) {
+        if (Math.abs(gx - cx) < 15) continue;
+        const len = eStr * 12;
+        if (Math.abs(len) < 2) continue;
+        mCtx.strokeStyle = `rgba(249,117,131,${dAlpha})`;
+        mCtx.lineWidth = 1;
+        mCtx.beginPath();
+        mCtx.moveTo(gx, gy);
+        mCtx.lineTo(gx, gy - len);
+        mCtx.stroke();
+        mCtx.fillStyle = `rgba(249,117,131,${dAlpha})`;
+        mCtx.beginPath();
+        const dir = len > 0 ? -1 : 1;
+        mCtx.moveTo(gx, gy - len);
+        mCtx.lineTo(gx - 3, gy - len + 5 * dir);
+        mCtx.lineTo(gx + 3, gy - len + 5 * dir);
+        mCtx.closePath();
+        mCtx.fill();
+      }
+    }
+
+    // Extra B rings from displacement current
+    mCtx.strokeStyle = `rgba(210,168,255,${dAlpha * 0.5})`;
+    mCtx.lineWidth = 1.5;
+    mCtx.setLineDash([5, 5]);
+    for (let i = 1; i <= 3; i++) {
+      const r = i * 50;
+      mCtx.beginPath();
+      mCtx.arc(cx, cy, r, 0, Math.PI * 2);
+      mCtx.stroke();
+    }
+    mCtx.setLineDash([]);
+
+    mCtx.fillStyle = '#d2a8ff';
+    mCtx.font = '11px sans-serif';
+    mCtx.textAlign = 'right';
+    mCtx.fillText('Displacement current: μ₀ε₀ ∂E/∂t', cx - 20, H - 30);
+    mCtx.fillText('(dashed B rings)', cx - 20, H - 15);
+  }
+
+  // Right-hand rule hint
+  mCtx.fillStyle = '#8b949e';
+  mCtx.font = '11px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('Right-hand rule: thumb = current direction, fingers = B field direction', cx, H - 8);
+
+  // Equation
+  mCtx.fillStyle = '#ffa657';
+  mCtx.font = 'bold 12px sans-serif';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('∮B·dl = μ₀I_enc + μ₀ε₀ ∂Φ_E/∂t', cx, 18);
+
+  // Charts
+  document.getElementById('chart1Title').textContent = 'B field magnitude vs distance r';
+  document.getElementById('chart2Title').textContent = '∮B·dl around loop vs radius';
+  drawFieldChart(c1Ctx, c1C, x => {
+    const r = Math.max(10, Math.abs(x - cx));
+    return I * 40 / r + dEdt * 20 / Math.max(30, r);
+  }, '#79c0ff', '|B|', false);
+  drawFieldChart(c2Ctx, c2C, x => {
+    const r = Math.max(10, Math.abs(x - cx));
+    const encloseWire = r < 4 ? 0 : 1;
+    return I * encloseWire + dEdt * Math.min(1, r / 100) * 0.5;
+  }, '#d2a8ff', '∮B·dl', false);
+}
+
+/* ========== ANIMATION ========== */
+function animate(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.04);
+  lastTs = ts;
+
+  if (!paused) {
+    time += dt;
+    switch (currentTab) {
+      case 0: drawEMWave(); break;
+      case 1: drawGaussE(); break;
+      case 2: drawGaussB(); break;
+      case 3: drawFaraday(); break;
+      case 4: drawAmpere(); break;
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+switchTab(0);
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
