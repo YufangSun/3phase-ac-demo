@@ -180,6 +180,7 @@
       <label style="font-size:.78em">Method:</label>
       <select id="sub-method">
         <option value="borrow">Direct Borrow</option>
+        <option value="ones">One's Complement</option>
         <option value="twos">Two's Complement</option>
       </select>
     </div>
@@ -202,8 +203,10 @@
   <br><br>
   <strong>Binary Addition:</strong> 0+0=0, 0+1=1, 1+0=1, 1+1=10 (write 0, carry 1). Just like decimal addition but base-2.
   <br><br>
-  <strong>Binary Subtraction:</strong> Two methods — <em>Direct Borrow</em> (like decimal: borrow from the next column when needed)
-  or <em>Two's Complement</em> (invert B, add 1, then add to A — the hardware way).
+  <strong>Binary Subtraction:</strong> Three methods —
+  <em>Direct Borrow</em> (like decimal: borrow from the next column when needed),
+  <em>One's Complement</em> (invert B, add to A, then end-around carry — add any overflow carry back to the LSB), or
+  <em>Two's Complement</em> (invert B, add 1, then add to A — the standard hardware method).
   <br><br>
   <a href="index.html">← 3-Phase AC</a> ·
   <a href="kmap.html">K-Map Simplifier</a> ·
@@ -585,6 +588,8 @@ function subCompute(stepping) {
 
   if (method === 'borrow') {
     subBorrow(a, b, stepping);
+  } else if (method === 'ones') {
+    subOnes(a, b, stepping);
   } else {
     subTwos(a, b, stepping);
   }
@@ -715,6 +720,156 @@ function showSubBorrowSteps(topBin, botBin, borrows, results, bits, revealCol, n
   }
 
   box.innerHTML = html;
+}
+
+function subOnes(a, b, stepping) {
+  const bits = 9; // 8 data bits + sign
+  const aBin = toBin(a, bits);
+  const bBin = toBin(b, bits);
+  const result = a - b;
+
+  // One's complement of B: invert all bits (no +1, unlike two's complement)
+  const bInv = bBin.split('').map(c => c === '0' ? '1' : '0').join('');
+  const bInvVal = parseInt(bInv, 2);
+
+  // Step 1: Add A + ~B
+  const rawSum1 = a + bInvVal;
+  const sum1Bits = toBin(rawSum1, bits + 1);
+  const hasCarry = sum1Bits[0] === '1';
+  const partial = sum1Bits.slice(1); // discard overflow bit
+  const partialVal = parseInt(partial, 2);
+
+  // Step 2: End-around carry — if there's an overflow carry, add it back to the result
+  // If no carry, result is negative; take one's complement of partial to get magnitude
+  let finalVal, finalBin;
+  if (hasCarry) {
+    finalVal = partialVal + 1; // add the carry back
+    finalBin = toBin(finalVal, bits);
+  } else {
+    // Negative result: partial is in one's complement form
+    // Invert to get magnitude
+    const mag = partial.split('').map(c => c === '0' ? '1' : '0').join('');
+    finalVal = parseInt(mag, 2);
+    finalBin = mag;
+  }
+
+  const box = document.getElementById('sub-steps');
+  let html = '';
+
+  html += `<div style="text-align:center;font-size:.85em;color:#8b949e;margin-bottom:8px">`;
+  html += `A − B = A + (one's complement of B), then <strong style="color:#d29922">end-around carry</strong></div>`;
+
+  // Show B
+  html += `<div style="text-align:center;margin:6px 0"><span style="color:#8b949e">B = </span><span style="font-family:'Courier New',monospace;color:#bc8cff">${bBin}</span>`;
+  html += `<span style="color:#8b949e;font-size:.85em"> (${b})</span></div>`;
+
+  // Show ~B (one's complement)
+  html += `<div style="text-align:center;margin:6px 0"><span style="color:#8b949e">~B = </span><span style="font-family:'Courier New',monospace;color:#d29922">${bInv}</span>`;
+  html += `<span style="color:#8b949e;font-size:.85em"> (invert all bits — one's complement of ${b})</span></div>`;
+
+  // Step 1: A + ~B
+  html += `<div style="text-align:center;font-size:.85em;color:#58a6ff;margin:10px 0"><strong>Step 1:</strong> Add A + ~B</div>`;
+  html += '<div style="margin:8px 0">';
+
+  // A row
+  html += '<div class="step-row">';
+  html += '<div class="step-label">A</div>';
+  html += '<div class="step-cell"></div>';
+  for (let i = 0; i < bits; i++) {
+    html += `<div class="step-cell" style="color:#58a6ff">${aBin[i]}</div>`;
+  }
+  html += '</div>';
+
+  // ~B row
+  html += '<div class="step-row">';
+  html += '<div class="step-label" style="color:#d29922">+ ~B</div>';
+  html += '<div class="step-cell"></div>';
+  for (let i = 0; i < bits; i++) {
+    html += `<div class="step-cell" style="color:#d29922">${bInv[i]}</div>`;
+  }
+  html += '</div>';
+
+  // Separator
+  html += '<div class="step-row"><div class="step-label"></div>';
+  for (let i = 0; i <= bits; i++) html += '<div class="step-cell" style="border-bottom:2px solid #30363d;height:4px"></div>';
+  html += '</div>';
+
+  // Raw sum (with overflow bit)
+  html += '<div class="step-row">';
+  html += '<div class="step-label" style="color:#8b949e">Sum</div>';
+  const oColor = hasCarry ? '#d29922' : '#484f58';
+  html += `<div class="step-cell" style="color:${oColor};font-size:.9em">${sum1Bits[0]}</div>`;
+  for (let i = 1; i <= bits; i++) {
+    html += `<div class="step-cell" style="color:#e6edf3">${sum1Bits[i]}</div>`;
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Step 2: End-around carry
+  if (hasCarry) {
+    html += `<div style="text-align:center;font-size:.85em;color:#d29922;margin:10px 0">`;
+    html += `<strong>Step 2:</strong> Carry out = <strong>1</strong> → add it back to the result (end-around carry)</div>`;
+
+    html += '<div style="margin:8px 0">';
+    html += '<div class="step-row">';
+    html += '<div class="step-label" style="color:#8b949e">Partial</div>';
+    for (let i = 0; i < bits; i++) {
+      html += `<div class="step-cell" style="color:#e6edf3">${partial[i]}</div>`;
+    }
+    html += '</div>';
+
+    html += '<div class="step-row">';
+    html += '<div class="step-label" style="color:#d29922">+ carry</div>';
+    for (let i = 0; i < bits - 1; i++) {
+      html += '<div class="step-cell"></div>';
+    }
+    html += '<div class="step-cell" style="color:#d29922">1</div>';
+    html += '</div>';
+
+    // Separator
+    html += '<div class="step-row"><div class="step-label"></div>';
+    for (let i = 0; i < bits; i++) html += '<div class="step-cell" style="border-bottom:2px solid #30363d;height:4px"></div>';
+    html += '</div>';
+
+    // Final result
+    html += '<div class="step-row result-row">';
+    html += '<div class="step-label" style="color:#3fb950">Result</div>';
+    for (let i = 0; i < bits; i++) {
+      html += `<div class="step-cell" style="color:#3fb950">${finalBin[i]}</div>`;
+    }
+    html += '</div>';
+    html += '</div>';
+
+    html += `<div style="text-align:center;font-size:.85em;color:#3fb950;margin-top:8px">`;
+    html += `Result = <strong>+${finalVal}</strong> = <strong>${result}</strong></div>`;
+  } else {
+    html += `<div style="text-align:center;font-size:.85em;color:#da3633;margin:10px 0">`;
+    html += `<strong>Step 2:</strong> No carry out → result is <strong>negative</strong>. Invert the sum to get the magnitude.</div>`;
+
+    html += '<div style="margin:8px 0">';
+    html += '<div class="step-row">';
+    html += '<div class="step-label" style="color:#8b949e">Sum</div>';
+    for (let i = 0; i < bits; i++) {
+      html += `<div class="step-cell" style="color:#e6edf3">${partial[i]}</div>`;
+    }
+    html += '</div>';
+
+    html += '<div class="step-row">';
+    html += '<div class="step-label" style="color:#da3633">~Sum</div>';
+    for (let i = 0; i < bits; i++) {
+      html += `<div class="step-cell" style="color:#da3633">${finalBin[i]}</div>`;
+    }
+    html += '</div>';
+    html += '</div>';
+
+    html += `<div style="text-align:center;font-size:.85em;color:#da3633;margin-top:8px">`;
+    html += `Magnitude = ${finalVal}, so result = <strong>−${finalVal}</strong> = <strong>${result}</strong></div>`;
+  }
+
+  box.innerHTML = html;
+  document.getElementById('sub-result').innerHTML =
+    `<span style="color:#f78166">${a}</span> − <span style="color:#f78166">${b}</span> = <span style="color:#3fb950">${result}</span>` +
+    `<br><span style="font-size:.7em;color:#8b949e">One's complement method</span>`;
 }
 
 function subTwos(a, b, stepping) {
