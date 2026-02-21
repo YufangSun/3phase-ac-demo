@@ -97,7 +97,7 @@
   </div>
   <div class="row">
     <div class="panel panel-full">
-      <h2>Waveforms — v(t), i(t), and instantaneous power p(t)</h2>
+      <h2 style="display:flex;align-items:center;gap:12px">Waveforms — v(t), i(t), and instantaneous power p(t) <button id="btnPause" onclick="togglePause()" style="font-size:.75em;padding:3px 14px;border-radius:6px;border:1px solid #444;background:#21262d;color:#e6edf3;cursor:pointer">Pause</button></h2>
       <canvas id="waveCanvas" width="1000" height="300"></canvas>
     </div>
   </div>
@@ -592,7 +592,14 @@ function drawWaveforms() {
 }
 
 // ── Animation ──
+let paused = false;
+function togglePause() {
+  paused = !paused;
+  document.getElementById('btnPause').textContent = paused ? 'Play' : 'Pause';
+  if (!paused) { lastTS = 0; requestAnimationFrame(animate); }
+}
 function animate(ts) {
+  if (paused) return;
   if (!lastTS) lastTS = ts;
   const dt = Math.min((ts - lastTS) / 1000, 0.05);
   lastTS = ts;
