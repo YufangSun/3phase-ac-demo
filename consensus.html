@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consensus Theorem — Boolean Algebra</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:18px}
+  h1{font-size:1.5em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.92em;text-align:center;max-width:820px}
+
+  .main{max-width:1100px;width:100%;margin-top:10px}
+  .row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:14px}
+  .panel{background:#161b22;border-radius:12px;padding:16px;border:1px solid #30363d;flex:1;min-width:320px}
+  .panel h2{font-size:.95em;color:#8b949e;margin-bottom:10px;text-align:center}
+
+  /* Theorem box */
+  .theorem-box{background:#0d1117;border:1px solid #30363d;border-radius:10px;
+    padding:14px 20px;text-align:center;margin-bottom:14px;max-width:800px;width:100%}
+  .theorem-box .label{font-size:.8em;color:#8b949e;margin-bottom:6px}
+  .expr{font-size:1.2em;font-family:'Courier New',monospace;letter-spacing:.5px;margin:4px 0}
+  .expr .term{color:#3fb950}
+  .expr .consensus{color:#f97583;text-decoration:line-through;text-decoration-thickness:2px}
+  .expr .op{color:#8b949e}
+  .expr .eq{color:#d2a8ff}
+
+  /* Truth table */
+  .tt-wrap{overflow-x:auto}
+  .tt{border-collapse:collapse;width:100%;font-size:.85em;font-family:'Courier New',monospace}
+  .tt th{background:#21262d;color:#8b949e;padding:6px 8px;border:1px solid #30363d;
+    font-size:.78em;text-transform:uppercase;white-space:nowrap}
+  .tt td{padding:6px 8px;border:1px solid #30363d;text-align:center;transition:background .15s}
+  .tt td.v1{color:#3fb950;font-weight:bold}
+  .tt td.v0{color:#484f58}
+  .tt .match{background:#3fb95012}
+  .tt .redundant{background:#f9758312}
+  .tt .sep{border-left:2px solid #58a6ff}
+
+  /* K-map */
+  canvas{display:block;border-radius:10px}
+
+  /* Proof */
+  .proof{font-family:'Courier New',monospace;font-size:.92em;line-height:2}
+  .proof .step{opacity:0.25;transition:opacity .3s}
+  .proof .step.visible{opacity:1}
+  .proof .step .rule{color:#8b949e;font-size:.8em}
+  .proof .step .hi{color:#f0883e}
+  .proof .step .result{color:#3fb950}
+
+  /* Buttons */
+  button{background:#238636;color:white;border:none;padding:6px 14px;border-radius:6px;
+    cursor:pointer;font-size:.82em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d}
+  button.sec:hover{background:#484f58}
+  .btn-row{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+
+  /* Dual */
+  .dual-box{background:#0d1117;border:1px solid #30363d;border-radius:10px;
+    padding:12px 18px;margin-top:10px;font-family:'Courier New',monospace;font-size:.9em;line-height:1.9}
+  .dual-box .label{font-size:.78em;color:#8b949e;margin-bottom:4px;font-family:'Segoe UI',system-ui,sans-serif}
+
+  .info{max-width:800px;width:100%;margin-top:16px;padding:14px 18px;
+    background:#161b22;border-radius:12px;border:1px solid #30363d;font-size:.85em;line-height:1.7;color:#8b949e}
+  .info a{color:#58a6ff;text-decoration:none}
+  .info a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>Consensus Theorem</h1>
+<p class="subtitle">The consensus term is always redundant — removing it simplifies the expression without changing the function.</p>
+
+<div class="theorem-box">
+  <div class="label">SUM-OF-PRODUCTS FORM</div>
+  <div class="expr">
+    <span class="term">XY</span> <span class="op">+</span>
+    <span class="term">X'Z</span> <span class="op">+</span>
+    <span class="consensus">YZ</span> <span class="eq">=</span>
+    <span class="term">XY</span> <span class="op">+</span>
+    <span class="term">X'Z</span>
+  </div>
+  <div style="font-size:.78em;color:#7d8590;margin-top:4px">YZ is the <span style="color:#f97583">consensus term</span> — it adds no new minterms</div>
+</div>
+
+<div class="main">
+  <div class="row">
+    <!-- Truth Table -->
+    <div class="panel" style="max-width:520px">
+      <h2>Truth Table</h2>
+      <div class="tt-wrap">
+        <table class="tt" id="ttable"></table>
+      </div>
+      <div style="margin-top:8px;font-size:.78em;color:#7d8590;text-align:center">
+        <span style="color:#f97583">&#9632;</span> = YZ=1 but already covered by XY or X'Z &nbsp;
+        <span style="color:#3fb950">&#9632;</span> = outputs match
+      </div>
+    </div>
+
+    <!-- K-Map -->
+    <div class="panel" style="max-width:540px">
+      <h2>Karnaugh Map</h2>
+      <canvas id="kmapCanvas" width="500" height="280"></canvas>
+      <div class="btn-row">
+        <button id="btnToggleConsensus" onclick="toggleConsensus()">Hide Consensus Group</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Venn Diagram -->
+    <div class="panel" style="max-width:440px">
+      <h2>Venn Diagram</h2>
+      <canvas id="vennCanvas" width="400" height="320"></canvas>
+      <div class="btn-row">
+        <button id="btnToggleVenn" onclick="toggleVenn()">Hide Consensus Region</button>
+      </div>
+    </div>
+
+    <!-- Algebraic Proof -->
+    <div class="panel" style="max-width:600px">
+      <h2>Algebraic Proof</h2>
+      <div class="proof" id="proofBox"></div>
+      <div class="btn-row">
+        <button onclick="nextStep()">Next Step</button>
+        <button class="sec" onclick="showAll()">Show All</button>
+        <button class="sec" onclick="resetProof()">Reset</button>
+      </div>
+
+      <div class="dual-box">
+        <div class="label">DUAL FORM (Product-of-Sums)</div>
+        <span style="color:#58a6ff">(X+Y)</span><span style="color:#8b949e">·</span><span style="color:#58a6ff">(X'+Z)</span><span style="color:#8b949e">·</span><span style="color:#f97583;text-decoration:line-through">(Y+Z)</span> <span style="color:#d2a8ff">=</span> <span style="color:#58a6ff">(X+Y)</span><span style="color:#8b949e">·</span><span style="color:#58a6ff">(X'+Z)</span>
+        <div style="font-size:.78em;color:#7d8590;margin-top:4px">By duality: replace + ↔ · , 0 ↔ 1 — the same redundancy applies.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Consensus Theorem:</strong> Given XY + X'Z, the term YZ is called the <em>consensus</em> of XY and X'Z.
+  It is formed by combining the remaining literals (Y from XY, Z from X'Z) after removing the complementary pair (X, X').
+  Since X is either 0 or 1, the YZ region is always covered by one of the two essential terms — making it redundant.<br>
+  <strong>Application:</strong> Used to simplify Boolean expressions and reduce gate count in digital circuit design.<br><br>
+  <a href="index.html">&larr; All Demos</a> &middot;
+  <a href="kmap.html">K-Map Simplifier</a> &middot;
+  <a href="binary-arithmetic.html">Binary Arithmetic</a>
+</div>
+
+<script>
+// ── Truth Table ──
+function buildTruthTable() {
+  const hdr = ['X','Y','Z','','XY',"X'Z",'YZ','','XY+X\'Z+YZ','XY+X\'Z'];
+  let html = '<thead><tr>';
+  hdr.forEach((h,i) => {
+    if (i === 3 || i === 7) html += '<th class="sep" style="border:none;width:4px;padding:0"></th>';
+    else html += '<th' + (i > 7 ? ' class="sep"' : '') + '>' + h + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  for (let i = 0; i < 8; i++) {
+    const X = (i >> 2) & 1, Y = (i >> 1) & 1, Z = i & 1;
+    const XY = X & Y, XpZ = (~X & 1) & Z, YZ = Y & Z;
+    const withC = XY | XpZ | YZ, without = XY | XpZ;
+    const redundant = YZ === 1 && (XY | XpZ) === 1;
+
+    html += '<tr' + (redundant ? ' class="redundant"' : '') + '>';
+    [X, Y, Z].forEach(v => html += '<td class="v' + v + '">' + v + '</td>');
+    html += '<td style="border:none;width:4px;padding:0"></td>';
+    [XY, XpZ, YZ].forEach(v => html += '<td class="v' + v + '">' + v + '</td>');
+    html += '<td style="border:none;width:4px;padding:0"></td>';
+    html += '<td class="v' + withC + ' sep match">' + withC + '</td>';
+    html += '<td class="v' + without + ' match">' + without + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  document.getElementById('ttable').innerHTML = html;
+}
+
+// ── K-Map ──
+let showConsensus = true;
+function toggleConsensus() {
+  showConsensus = !showConsensus;
+  document.getElementById('btnToggleConsensus').textContent = showConsensus ? 'Hide Consensus Group' : 'Show Consensus Group';
+  drawKmap();
+}
+
+function drawKmap() {
+  const c = document.getElementById('kmapCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // K-map layout: rows = X (0,1), cols = YZ (00,01,11,10) in Gray code
+  const cellW = 72, cellH = 60;
+  const startX = 120, startY = 80;
+
+  // Headers
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.fillStyle = '#bc8cff';
+  ctx.textAlign = 'center';
+  ctx.fillText('YZ', startX + cellW * 2, startY - 45);
+  ctx.save();
+  ctx.translate(startX - 45, startY + cellH);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('X', 0, 0);
+  ctx.restore();
+
+  // Column labels
+  ctx.font = '13px "Courier New", monospace';
+  ctx.fillStyle = '#8b949e';
+  const colLabels = ['00','01','11','10'];
+  colLabels.forEach((l, i) => ctx.fillText(l, startX + i * cellW + cellW / 2, startY - 8));
+
+  // Row labels
+  ctx.fillText('0', startX - 20, startY + cellH / 2 + 5);
+  ctx.fillText('1', startX - 20, startY + cellH + cellH / 2 + 5);
+
+  // Evaluate: F(X,Y,Z) = XY + X'Z
+  // K-map cells [X][YZ-gray]: row0=X=0, row1=X=1
+  // Gray order: YZ = 00, 01, 11, 10
+  // row 0 (X=0): X'Z = Z → 00:0, 01:1, 11:1, 10:0
+  // row 1 (X=1): XY  = Y → 00:0, 01:0, 11:1, 10:1
+  const vals = [
+    [0, 1, 1, 0],  // X=0
+    [0, 0, 1, 1],  // X=1
+  ];
+
+  // Draw cells
+  for (let r = 0; r < 2; r++) {
+    for (let c2 = 0; c2 < 4; c2++) {
+      const x = startX + c2 * cellW, y = startY + r * cellH;
+      ctx.fillStyle = vals[r][c2] ? '#3fb95018' : '#0d1117';
+      ctx.fillRect(x, y, cellW, cellH);
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, cellW, cellH);
+
+      ctx.font = 'bold 18px "Courier New", monospace';
+      ctx.fillStyle = vals[r][c2] ? '#3fb950' : '#484f58';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(vals[r][c2], x + cellW / 2, y + cellH / 2);
+
+      // Minterm index
+      const yzGray = [0,1,3,2];
+      const minterm = r * 4 + yzGray[c2];
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = '#484f58';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('m' + minterm, x + cellW - 4, y + cellH - 3);
+    }
+  }
+
+  // Group overlays
+  const pad = 6;
+
+  // X'Z group (blue): X=0, YZ=01,11 → row 0, cols 1,2
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  roundRect(ctx, startX + cellW - pad, startY - pad, cellW * 2 + pad * 2, cellH + pad * 2, 12);
+  ctx.stroke();
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#58a6ff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText("X'Z", startX + cellW * 3 + pad + 6, startY - pad);
+
+  // XY group (green): X=1, YZ=11,10 → row 1, cols 2,3
+  ctx.strokeStyle = '#3fb950';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  roundRect(ctx, startX + cellW * 2 - pad, startY + cellH - pad, cellW * 2 + pad * 2, cellH + pad * 2, 12);
+  ctx.stroke();
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#3fb950';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('XY', startX + cellW * 4 + pad + 6, startY + cellH - pad);
+
+  // Consensus: YZ group (orange dashed): YZ=11 → col 2, both rows
+  if (showConsensus) {
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 4]);
+    roundRect(ctx, startX + cellW * 2 - pad + 2, startY - pad + 2, cellW + pad * 2 - 4, cellH * 2 + pad * 2 - 4, 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#f0883e';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('YZ (redundant)', startX + cellW * 2 + cellW / 2, startY + cellH * 2 + pad + 6);
+  }
+
+  // Legend
+  const ly = H - 30;
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(20, ly); ctx.lineTo(50, ly); ctx.stroke();
+  ctx.fillStyle = '#3fb950'; ctx.fillText('XY', 55, ly);
+
+  ctx.strokeStyle = '#58a6ff';
+  ctx.beginPath(); ctx.moveTo(100, ly); ctx.lineTo(130, ly); ctx.stroke();
+  ctx.fillStyle = '#58a6ff'; ctx.fillText("X'Z", 135, ly);
+
+  ctx.strokeStyle = '#f0883e'; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(185, ly); ctx.lineTo(215, ly); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#f0883e'; ctx.fillText('YZ (consensus)', 220, ly);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── Venn Diagram ──
+let showVennConsensus = true;
+function toggleVenn() {
+  showVennConsensus = !showVennConsensus;
+  document.getElementById('btnToggleVenn').textContent = showVennConsensus ? 'Hide Consensus Region' : 'Show Consensus Region';
+  drawVenn();
+}
+
+function drawVenn() {
+  const c = document.getElementById('vennCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H / 2 - 10;
+  const r = 90;
+  const d = 55; // distance from center to circle center
+
+  // Circle centers (X top-left, Y top-right, Z bottom)
+  const circles = [
+    { x: cx - d * 0.7, y: cy - d * 0.4, label: 'X', color: '#58a6ff' },
+    { x: cx + d * 0.7, y: cy - d * 0.4, label: 'Y', color: '#3fb950' },
+    { x: cx,           y: cy + d * 0.7,  label: 'Z', color: '#f0883e' },
+  ];
+
+  // Fill regions using pixel-level compositing
+  // We'll use a simpler approach: draw filled regions with clipping
+
+  // Region: XY (X AND Y) — green fill
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(circles[0].x, circles[0].y, r, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.beginPath();
+  ctx.arc(circles[1].x, circles[1].y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#3fb95035';
+  ctx.fill();
+  ctx.restore();
+
+  // Region: X'Z (NOT X AND Z) — blue fill
+  ctx.save();
+  // Clip to Z circle
+  ctx.beginPath();
+  ctx.arc(circles[2].x, circles[2].y, r, 0, Math.PI * 2);
+  ctx.clip();
+  // Fill entire clip area
+  ctx.fillStyle = '#58a6ff30';
+  ctx.fillRect(0, 0, W, H);
+  // Cut out X circle (X' means NOT X)
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(circles[0].x, circles[0].y, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,1)';
+  ctx.fill();
+  ctx.restore();
+
+  // Consensus region: YZ (Y AND Z) — orange dashed outline
+  if (showVennConsensus) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(circles[1].x, circles[1].y, r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.arc(circles[2].x, circles[2].y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0883e18';
+    ctx.fill();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    ctx.setLineDash([]);
+  }
+
+  // Draw circle outlines
+  circles.forEach((circ) => {
+    ctx.beginPath();
+    ctx.arc(circ.x, circ.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = circ.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Labels
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#58a6ff';
+  ctx.fillText('X', circles[0].x - 50, circles[0].y - 50);
+  ctx.fillStyle = '#3fb950';
+  ctx.fillText('Y', circles[1].x + 50, circles[1].y - 50);
+  ctx.fillStyle = '#f0883e';
+  ctx.fillText('Z', circles[2].x + 55, circles[2].y + 45);
+
+  // Region labels
+  ctx.font = '13px sans-serif';
+  ctx.fillStyle = '#3fb950';
+  ctx.fillText('XY', cx, cy - d * 0.6);
+  ctx.fillStyle = '#58a6ff';
+  ctx.fillText("X'Z", cx + d * 0.3, cy + d * 0.9);
+
+  if (showVennConsensus) {
+    ctx.fillStyle = '#f0883e';
+    ctx.fillText('YZ', cx + d * 1.0, cy + d * 0.2);
+  }
+
+  // Explanation text
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#7d8590';
+  ctx.textAlign = 'center';
+  ctx.fillText('YZ region is fully covered by XY ∪ X\'Z', W / 2, H - 12);
+}
+
+// ── Algebraic Proof ──
+const proofSteps = [
+  { text: '  XY + X\'Z + <span class="hi">YZ</span>', rule: 'given expression' },
+  { text: '= XY + X\'Z + YZ·<span class="hi">1</span>', rule: 'identity: A·1 = A' },
+  { text: '= XY + X\'Z + YZ·<span class="hi">(X + X\')</span>', rule: 'complement: X + X\' = 1' },
+  { text: '= XY + X\'Z + <span class="hi">XYZ + X\'YZ</span>', rule: 'distributive law' },
+  { text: '= <span class="hi">(XY + XYZ)</span> + <span class="hi">(X\'Z + X\'YZ)</span>', rule: 'regroup terms' },
+  { text: '= XY·<span class="hi">(1 + Z)</span> + X\'Z·<span class="hi">(1 + Y)</span>', rule: 'factor out common terms' },
+  { text: '= XY·<span class="hi">1</span> + X\'Z·<span class="hi">1</span>', rule: 'dominance: 1 + A = 1' },
+  { text: '= <span class="result">XY + X\'Z</span>', rule: 'identity: A·1 = A  ∎' },
+];
+
+let currentStep = 0;
+
+function buildProof() {
+  let html = '';
+  proofSteps.forEach((s, i) => {
+    html += '<div class="step" id="step' + i + '">' + s.text +
+      '  <span class="rule">[' + s.rule + ']</span></div>';
+  });
+  document.getElementById('proofBox').innerHTML = html;
+  document.getElementById('step0').classList.add('visible');
+  currentStep = 0;
+}
+
+function nextStep() {
+  if (currentStep < proofSteps.length - 1) {
+    currentStep++;
+    document.getElementById('step' + currentStep).classList.add('visible');
+  }
+}
+
+function showAll() {
+  for (let i = 0; i < proofSteps.length; i++) {
+    document.getElementById('step' + i).classList.add('visible');
+  }
+  currentStep = proofSteps.length - 1;
+}
+
+function resetProof() {
+  for (let i = 1; i < proofSteps.length; i++) {
+    document.getElementById('step' + i).classList.remove('visible');
+  }
+  currentStep = 0;
+}
+
+// ── Init ──
+buildTruthTable();
+drawKmap();
+drawVenn();
+buildProof();
+</script>
+</body>
+</html>
