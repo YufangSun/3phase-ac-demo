@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Domain ↔ Phasor Domain Transform</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+  h1{font-size:1.5em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:8px;font-size:.92em;text-align:center;max-width:900px}
+  canvas{display:block;border-radius:10px}
+  .main-row{display:flex;gap:10px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
+  .col{display:flex;flex-direction:column;gap:10px;align-items:center}
+  .col-label{font-size:.85em;color:#8b949e;text-align:center;font-weight:bold;
+    background:#161b22;border:1px solid #30363d;border-radius:8px;padding:4px 14px}
+  .arrow-box{display:flex;align-items:center;justify-content:center;font-size:2em;color:#ffa657;
+    padding:0 8px;align-self:center;margin-top:120px}
+  .signal-list{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px;
+    max-width:1100px;width:100%;margin-top:10px}
+  .signal-list h3{font-size:.85em;color:#8b949e;margin-bottom:6px;text-align:center}
+  .sig-row{display:flex;gap:8px;align-items:center;padding:4px 0;flex-wrap:wrap;justify-content:center}
+  .sig-row label{font-size:.78em;color:#8b949e;min-width:55px;text-align:right}
+  .sig-row input[type="range"]{width:80px;accent-color:#f78166}
+  .sig-row .sv{font-size:.78em;color:#f78166;min-width:35px}
+  .sig-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+  .sig-row button{background:#30363d;color:#8b949e;border:none;padding:3px 8px;border-radius:4px;
+    cursor:pointer;font-size:.75em}
+  .sig-row button:hover{background:#484f58;color:#e6edf3}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;justify-content:center;align-items:center}
+  .cg{display:flex;align-items:center;gap:4px}
+  .cg label{font-size:.78em;color:#8b949e;white-space:nowrap}
+  input[type="range"]{accent-color:#f78166}
+  .val{font-size:.78em;color:#f78166;min-width:32px}
+  button{background:#238636;color:white;border:none;padding:5px 14px;border-radius:6px;
+    cursor:pointer;font-size:.82em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d;color:#8b949e}
+  button.sec:hover{background:#484f58;color:#e6edf3}
+  .eq-box{background:#161b22;border:1px solid #30363d;border-radius:8px;
+    padding:8px 14px;margin:6px 0;max-width:1100px;width:100%;text-align:center}
+  .eq{font-size:1.05em;font-family:'Times New Roman',serif;color:#e0e0ff}
+  .eq-sub{font-size:.78em;color:#7d8590;margin-top:2px}
+  .meters{display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap}
+  .meter{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:4px 10px;text-align:center;min-width:90px}
+  .meter .ml{font-size:.65em;color:#8b949e}
+  .meter .mv{font-size:.85em;font-weight:bold;font-family:'Courier New',monospace}
+  .info{max-width:1100px;width:100%;background:#161b22;border-radius:12px;
+    padding:12px 16px;border:1px solid #30363d;margin-top:12px;font-size:.82em;line-height:1.5;color:#8b949e}
+  .info strong{color:#e0e0ff}
+  .info code{color:#f78166;background:#21262d;padding:1px 4px;border-radius:3px}
+  a{color:#58a6ff}
+</style>
+</head>
+<body>
+
+<h1>Time Domain ↔ Phasor Domain</h1>
+<p class="subtitle">Watch how sinusoidal signals become rotating phasors — and how phasor addition in the complex plane maps back to waveform superposition in time</p>
+
+<div class="eq-box">
+  <div class="eq">v(t) = V<sub>m</sub> sin(ωt + φ) &nbsp;⟺&nbsp; <b style="color:#ffa657">V</b> = V<sub>m</sub> ∠φ = V<sub>m</sub> e<sup>jφ</sup></div>
+  <div class="eq-sub">Time domain (real, oscillating) &nbsp;↔&nbsp; Phasor domain (complex, stationary snapshot at t=0) &nbsp;↔&nbsp; Rotating phasor (e<sup>jωt</sup> spins it)</div>
+</div>
+
+<div class="main-row">
+  <div class="col">
+    <div class="col-label">Phasor Domain (complex plane)</div>
+    <canvas id="phasorCanvas" width="420" height="420"></canvas>
+  </div>
+  <div class="arrow-box">⟺</div>
+  <div class="col">
+    <div class="col-label">Time Domain (waveform)</div>
+    <canvas id="timeCanvas" width="580" height="420"></canvas>
+  </div>
+</div>
+
+<div id="meterBox" class="meters"></div>
+
+<div class="signal-list" id="signalList">
+  <h3>Signals — add, remove, or adjust amplitude &amp; phase of each component</h3>
+  <div id="sigRows"></div>
+  <div style="text-align:center;margin-top:6px">
+    <button id="addSigBtn" class="sec">+ Add Signal</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="cg">
+    <label>ω (shared freq):</label>
+    <input type="range" id="omegaSlider" min="0.3" max="4" step="0.1" value="1.2" style="width:100px">
+    <span class="val" id="omegaVal">1.2 rad/s</span>
+  </div>
+  <div class="cg">
+    <label>Speed:</label>
+    <input type="range" id="speedSlider" min="0" max="3" step="0.1" value="1" style="width:80px">
+    <span class="val" id="speedVal">1.0x</span>
+  </div>
+  <div class="cg">
+    <label>Trail:</label>
+    <input type="range" id="trailSlider" min="0" max="1" step="0.05" value="0.4" style="width:70px">
+    <span class="val" id="trailVal">40%</span>
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="resetBtn" class="sec">Reset</button>
+  <button id="freezeBtn" class="sec">Freeze t=0 (static phasor)</button>
+</div>
+
+<div class="info">
+  <strong>Phasor Transform:</strong>
+  Any sinusoid at frequency ω can be represented as a <strong>phasor</strong> — a complex number
+  <code>V = Vm∠φ</code> encoding amplitude and phase.
+  The rotating phasor <code>Ve<sup>jωt</sup></code> spins at ω; its projection onto the vertical axis gives the
+  real time-domain signal <code>v(t) = Im{Ve<sup>jωt</sup>} = Vm sin(ωt+φ)</code>.
+  <br><br>
+  <strong>Why it matters:</strong> Adding sinusoids in the time domain (messy trigonometry) becomes simple
+  <strong>vector addition</strong> in the phasor domain. This is the foundation of AC circuit analysis —
+  impedances, power factor, and frequency response all live in the phasor world.
+  <br><br>
+  <strong>Try:</strong> Add two signals with different phases → see how phasor addition gives the sum waveform.
+  Set one to 0° and another to 90° to see quadrature. Freeze at t=0 to see the static phasor diagram.
+  <br><br>
+  <a href="index.html">← 3-Phase AC</a> ·
+  <a href="mutual-inductance.html">Mutual Inductance</a> ·
+  <a href="maxwell.html">Maxwell's Equations</a> ·
+  <a href="poynting.html">Poynting Theorem</a> ·
+  <a href="vectors.html">Dot &amp; Cross Product</a>
+</div>
+
+<script>
+const phasorC = document.getElementById('phasorCanvas');
+const timeC = document.getElementById('timeCanvas');
+const pCtx = phasorC.getContext('2d');
+const tCtx = timeC.getContext('2d');
+
+const COLORS = ['#f97583','#79c0ff','#7ee787','#d2a8ff','#ffa657','#ff7b72','#a5d6ff','#56d364'];
+const SUM_COLOR = '#ffcc00';
+
+let time = 0, paused = false, frozen = false, lastTs = 0;
+
+// Signals: {amp, phase (degrees), color}
+let signals = [
+  { amp: 1.0, phase: 0, color: COLORS[0] },
+  { amp: 0.7, phase: 60, color: COLORS[1] },
+];
+
+const omegaSlider = document.getElementById('omegaSlider');
+const speedSlider = document.getElementById('speedSlider');
+const trailSlider = document.getElementById('trailSlider');
+
+omegaSlider.oninput = () => document.getElementById('omegaVal').textContent = omegaSlider.value + ' rad/s';
+speedSlider.oninput = () => document.getElementById('speedVal').textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+trailSlider.oninput = () => document.getElementById('trailVal').textContent = Math.round(trailSlider.value * 100) + '%';
+
+document.getElementById('pauseBtn').onclick = function() {
+  paused = !paused; this.textContent = paused ? 'Play' : 'Pause';
+};
+document.getElementById('resetBtn').onclick = () => {
+  time = 0; paused = false; frozen = false;
+  document.getElementById('pauseBtn').textContent = 'Pause';
+  document.getElementById('freezeBtn').textContent = 'Freeze t=0 (static phasor)';
+  signals = [
+    { amp: 1.0, phase: 0, color: COLORS[0] },
+    { amp: 0.7, phase: 60, color: COLORS[1] },
+  ];
+  buildSignalUI();
+};
+document.getElementById('freezeBtn').onclick = function() {
+  frozen = !frozen;
+  if (frozen) { time = 0; paused = true; document.getElementById('pauseBtn').textContent = 'Play'; }
+  else { paused = false; document.getElementById('pauseBtn').textContent = 'Pause'; }
+  this.textContent = frozen ? 'Unfreeze (animate)' : 'Freeze t=0 (static phasor)';
+};
+
+document.getElementById('addSigBtn').onclick = () => {
+  if (signals.length >= 8) return;
+  signals.push({ amp: 0.5, phase: signals.length * 45, color: COLORS[signals.length % COLORS.length] });
+  buildSignalUI();
+};
+
+function buildSignalUI() {
+  const box = document.getElementById('sigRows');
+  box.innerHTML = '';
+  signals.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'sig-row';
+
+    const dot = document.createElement('div');
+    dot.className = 'sig-dot';
+    dot.style.background = s.color;
+
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:.8em;color:#e6edf3;min-width:25px;font-weight:bold';
+    lbl.textContent = 'V' + (i + 1);
+
+    // Amplitude
+    const al = document.createElement('label'); al.textContent = 'Amp:';
+    const ai = document.createElement('input'); ai.type = 'range'; ai.min = 0; ai.max = 2; ai.step = 0.05; ai.value = s.amp; ai.style.width = '80px';
+    const av = document.createElement('span'); av.className = 'sv'; av.textContent = s.amp.toFixed(2);
+    ai.oninput = () => { s.amp = parseFloat(ai.value); av.textContent = s.amp.toFixed(2); };
+
+    // Phase
+    const pl = document.createElement('label'); pl.textContent = 'Phase:';
+    const pi2 = document.createElement('input'); pi2.type = 'range'; pi2.min = -180; pi2.max = 180; pi2.step = 1; pi2.value = s.phase; pi2.style.width = '80px';
+    const pv = document.createElement('span'); pv.className = 'sv'; pv.textContent = s.phase + '°';
+    pi2.oninput = () => { s.phase = parseInt(pi2.value); pv.textContent = s.phase + '°'; };
+
+    // Remove
+    const rm = document.createElement('button');
+    rm.textContent = '✕';
+    rm.onclick = () => { if (signals.length > 1) { signals.splice(i, 1); buildSignalUI(); } };
+
+    // Phasor notation
+    const nota = document.createElement('span');
+    nota.style.cssText = 'font-size:.78em;color:#8b949e;font-family:serif;min-width:120px';
+    nota.className = 'sig-nota';
+    nota.dataset.idx = i;
+
+    row.append(dot, lbl, al, ai, av, pl, pi2, pv, nota, rm);
+    box.appendChild(row);
+  });
+}
+
+/* ===== DRAW PHASOR PLANE ===== */
+function drawPhasorPlane() {
+  const W = phasorC.width, H = phasorC.height;
+  const cx = W / 2, cy = H / 2;
+  const scale = 130; // px per unit
+  const omega = parseFloat(omegaSlider.value);
+  const trail = parseFloat(trailSlider.value);
+
+  pCtx.clearRect(0, 0, W, H);
+
+  // Grid circles
+  pCtx.strokeStyle = '#ffffff08';
+  pCtx.lineWidth = 1;
+  for (let r = 0.5; r <= 2.5; r += 0.5) {
+    pCtx.beginPath(); pCtx.arc(cx, cy, r * scale, 0, Math.PI * 2); pCtx.stroke();
+    pCtx.fillStyle = '#484f58';
+    pCtx.font = '9px sans-serif';
+    pCtx.textAlign = 'left';
+    pCtx.fillText(r.toFixed(1), cx + r * scale + 3, cy - 3);
+  }
+
+  // Axes
+  pCtx.strokeStyle = '#ffffff15';
+  pCtx.lineWidth = 1.5;
+  pCtx.beginPath(); pCtx.moveTo(0, cy); pCtx.lineTo(W, cy); pCtx.stroke();
+  pCtx.beginPath(); pCtx.moveTo(cx, 0); pCtx.lineTo(cx, H); pCtx.stroke();
+
+  // Axis labels
+  pCtx.fillStyle = '#484f58';
+  pCtx.font = '11px sans-serif';
+  pCtx.textAlign = 'center';
+  pCtx.fillText('Re', W - 15, cy - 8);
+  pCtx.fillText('Im', cx + 12, 15);
+
+  // Angle markers
+  pCtx.fillStyle = '#ffffff20';
+  pCtx.font = '9px sans-serif';
+  for (let deg = 0; deg < 360; deg += 45) {
+    const rad = deg * Math.PI / 180;
+    const r = 2.2 * scale;
+    pCtx.fillText(deg + '°', cx + Math.cos(rad) * r, cy - Math.sin(rad) * r + 3);
+  }
+
+  const wt = omega * time;
+
+  // Draw each signal's phasor
+  let sumRe = 0, sumIm = 0;
+  let sumStaticRe = 0, sumStaticIm = 0;
+
+  signals.forEach((s, i) => {
+    const phiRad = s.phase * Math.PI / 180;
+    const totalAngle = wt + phiRad;
+
+    // Rotating phasor tip
+    const re = s.amp * Math.cos(totalAngle);
+    const im = s.amp * Math.sin(totalAngle);
+    const sx = cx + re * scale;
+    const sy = cy - im * scale;
+
+    // Static phasor (at t=0)
+    const sRe = s.amp * Math.cos(phiRad);
+    const sIm = s.amp * Math.sin(phiRad);
+
+    sumRe += re; sumIm += im;
+    sumStaticRe += sRe; sumStaticIm += sIm;
+
+    // Rotation trail
+    if (trail > 0 && !frozen) {
+      pCtx.strokeStyle = s.color + Math.round(trail * 40).toString(16).padStart(2, '0');
+      pCtx.lineWidth = 1.5;
+      pCtx.beginPath();
+      pCtx.arc(cx, cy, s.amp * scale, 0, Math.PI * 2);
+      pCtx.stroke();
+    }
+
+    // Static phasor (dimmed, dashed) — always show the t=0 angle
+    if (!frozen) {
+      pCtx.strokeStyle = s.color + '40';
+      pCtx.lineWidth = 1.5;
+      pCtx.setLineDash([5, 5]);
+      pCtx.beginPath();
+      pCtx.moveTo(cx, cy);
+      pCtx.lineTo(cx + sRe * scale, cy - sIm * scale);
+      pCtx.stroke();
+      pCtx.setLineDash([]);
+    }
+
+    // Rotating (or frozen) phasor arrow
+    pCtx.strokeStyle = s.color;
+    pCtx.lineWidth = 3;
+    pCtx.shadowColor = s.color;
+    pCtx.shadowBlur = 6;
+    pCtx.beginPath();
+    pCtx.moveTo(cx, cy);
+    pCtx.lineTo(sx, sy);
+    pCtx.stroke();
+    pCtx.shadowBlur = 0;
+
+    // Arrowhead
+    const ang = Math.atan2(-im, re);
+    const hl = 10;
+    pCtx.fillStyle = s.color;
+    pCtx.beginPath();
+    pCtx.moveTo(sx, sy);
+    pCtx.lineTo(sx - hl * Math.cos(ang - 0.35), sy + hl * Math.sin(ang - 0.35));
+    pCtx.lineTo(sx - hl * Math.cos(ang + 0.35), sy + hl * Math.sin(ang + 0.35));
+    pCtx.closePath();
+    pCtx.fill();
+
+    // Tip dot
+    pCtx.beginPath();
+    pCtx.arc(sx, sy, 5, 0, Math.PI * 2);
+    pCtx.fillStyle = s.color;
+    pCtx.fill();
+
+    // Projection line to imaginary axis (shows v(t))
+    pCtx.strokeStyle = s.color + '40';
+    pCtx.lineWidth = 1;
+    pCtx.setLineDash([3, 4]);
+    pCtx.beginPath();
+    pCtx.moveTo(sx, sy);
+    pCtx.lineTo(cx, sy); // horizontal line to Im axis
+    pCtx.stroke();
+    pCtx.setLineDash([]);
+
+    // Projection dot on Im axis
+    pCtx.beginPath();
+    pCtx.arc(cx, sy, 3, 0, Math.PI * 2);
+    pCtx.fillStyle = s.color;
+    pCtx.fill();
+
+    // Label
+    pCtx.fillStyle = s.color;
+    pCtx.font = 'bold 11px sans-serif';
+    pCtx.textAlign = 'left';
+    const lx = sx + (re > 0 ? 10 : -30);
+    const ly = sy + (im > 0 ? -10 : 15);
+    pCtx.fillText('V' + (i + 1), lx, ly);
+
+    // Update notation
+    const nota = document.querySelector(`.sig-nota[data-idx="${i}"]`);
+    if (nota) nota.textContent = `= ${s.amp.toFixed(2)}∠${s.phase}°`;
+  });
+
+  // Sum phasor
+  if (signals.length > 1) {
+    const ssx = cx + sumRe * scale;
+    const ssy = cy - sumIm * scale;
+
+    // Sum arrow
+    pCtx.strokeStyle = SUM_COLOR;
+    pCtx.lineWidth = 3.5;
+    pCtx.shadowColor = SUM_COLOR;
+    pCtx.shadowBlur = 8;
+    pCtx.beginPath();
+    pCtx.moveTo(cx, cy);
+    pCtx.lineTo(ssx, ssy);
+    pCtx.stroke();
+    pCtx.shadowBlur = 0;
+
+    // Arrowhead
+    const sAng = Math.atan2(-sumIm, sumRe);
+    pCtx.fillStyle = SUM_COLOR;
+    pCtx.beginPath();
+    pCtx.moveTo(ssx, ssy);
+    pCtx.lineTo(ssx - 12 * Math.cos(sAng - 0.35), ssy + 12 * Math.sin(sAng - 0.35));
+    pCtx.lineTo(ssx - 12 * Math.cos(sAng + 0.35), ssy + 12 * Math.sin(sAng + 0.35));
+    pCtx.closePath();
+    pCtx.fill();
+
+    pCtx.beginPath(); pCtx.arc(ssx, ssy, 5, 0, Math.PI * 2); pCtx.fill();
+
+    // Projection
+    pCtx.strokeStyle = SUM_COLOR + '40';
+    pCtx.lineWidth = 1;
+    pCtx.setLineDash([3, 4]);
+    pCtx.beginPath(); pCtx.moveTo(ssx, ssy); pCtx.lineTo(cx, ssy); pCtx.stroke();
+    pCtx.setLineDash([]);
+    pCtx.beginPath(); pCtx.arc(cx, ssy, 4, 0, Math.PI * 2); pCtx.fillStyle = SUM_COLOR; pCtx.fill();
+
+    // Phasor addition chain (tip-to-tail)
+    let chainX = cx, chainY = cy;
+    signals.forEach((s, i) => {
+      const phiRad = s.phase * Math.PI / 180;
+      const ang = wt + phiRad;
+      const dx = s.amp * Math.cos(ang) * scale;
+      const dy = -s.amp * Math.sin(ang) * scale;
+      const nx = chainX + dx, ny = chainY + dy;
+      pCtx.strokeStyle = s.color + '60';
+      pCtx.lineWidth = 1.5;
+      pCtx.setLineDash([4, 4]);
+      pCtx.beginPath(); pCtx.moveTo(chainX, chainY); pCtx.lineTo(nx, ny); pCtx.stroke();
+      pCtx.setLineDash([]);
+      chainX = nx; chainY = ny;
+    });
+
+    // Sum label
+    const sumMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+    const sumPhase = Math.atan2(sumIm, sumRe) * 180 / Math.PI;
+    pCtx.fillStyle = SUM_COLOR;
+    pCtx.font = 'bold 11px sans-serif';
+    pCtx.textAlign = 'left';
+    pCtx.fillText('Σ = ' + sumMag.toFixed(2) + '∠' + sumPhase.toFixed(1) + '°', ssx + 10, ssy - 10);
+  }
+
+  // Title
+  pCtx.fillStyle = '#8b949e';
+  pCtx.font = '10px sans-serif';
+  pCtx.textAlign = 'center';
+  pCtx.fillText('Projection onto Im axis → v(t)', cx, H - 6);
+
+  // ωt indicator
+  const wtDeg = ((wt * 180 / Math.PI) % 360 + 360) % 360;
+  pCtx.fillStyle = '#ffa657';
+  pCtx.font = 'bold 10px sans-serif';
+  pCtx.textAlign = 'left';
+  pCtx.fillText('ωt = ' + wtDeg.toFixed(1) + '°', 8, 16);
+  pCtx.fillText('t = ' + time.toFixed(2) + ' s', 8, 30);
+}
+
+/* ===== DRAW TIME DOMAIN ===== */
+function drawTimeDomain() {
+  const W = timeC.width, H = timeC.height;
+  const pad = { l: 45, r: 15, t: 20, b: 25 };
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+  const midY = pad.t + pH / 2;
+  const omega = parseFloat(omegaSlider.value);
+
+  tCtx.clearRect(0, 0, W, H);
+
+  // Grid
+  tCtx.strokeStyle = '#ffffff06';
+  tCtx.lineWidth = 1;
+  for (let i = 0; i <= 8; i++) {
+    const y = pad.t + (i / 8) * pH;
+    tCtx.beginPath(); tCtx.moveTo(pad.l, y); tCtx.lineTo(pad.l + pW, y); tCtx.stroke();
+  }
+  // Time grid
+  const period = 2 * Math.PI / omega;
+  const tWindow = period * 3; // show 3 periods
+  for (let tp = 0; tp <= 3; tp++) {
+    const x = pad.l + (tp * period / tWindow) * pW;
+    tCtx.beginPath(); tCtx.moveTo(x, pad.t); tCtx.lineTo(x, pad.t + pH); tCtx.stroke();
+    tCtx.fillStyle = '#484f58';
+    tCtx.font = '9px sans-serif';
+    tCtx.textAlign = 'center';
+    tCtx.fillText(tp + 'T', x, H - 5);
+  }
+
+  // Zero line
+  tCtx.strokeStyle = '#ffffff18';
+  tCtx.lineWidth = 1;
+  tCtx.beginPath(); tCtx.moveTo(pad.l, midY); tCtx.lineTo(pad.l + pW, midY); tCtx.stroke();
+
+  // Axis labels
+  tCtx.fillStyle = '#484f58';
+  tCtx.font = '10px sans-serif';
+  tCtx.textAlign = 'right';
+  tCtx.fillText('+V', pad.l - 5, pad.t + 8);
+  tCtx.fillText('0', pad.l - 5, midY + 4);
+  tCtx.fillText('−V', pad.l - 5, pad.t + pH - 2);
+  tCtx.textAlign = 'center';
+  tCtx.fillText('t →', pad.l + pW / 2, H - 5);
+
+  // Find max amplitude for scaling
+  let maxAmp = 0;
+  signals.forEach(s => maxAmp += s.amp);
+  maxAmp = Math.max(maxAmp, 1) * 1.1;
+  const yScale = (pH / 2) / maxAmp;
+
+  // Draw each signal
+  const steps = 400;
+
+  signals.forEach((s, si) => {
+    const phiRad = s.phase * Math.PI / 180;
+    tCtx.strokeStyle = s.color;
+    tCtx.lineWidth = 2;
+    tCtx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * tWindow;
+      const v = s.amp * Math.sin(omega * t + phiRad);
+      const x = pad.l + (i / steps) * pW;
+      const y = midY - v * yScale;
+      i === 0 ? tCtx.moveTo(x, y) : tCtx.lineTo(x, y);
+    }
+    tCtx.stroke();
+
+    // Label at right edge
+    const vEnd = s.amp * Math.sin(omega * tWindow + phiRad);
+    tCtx.fillStyle = s.color;
+    tCtx.font = 'bold 10px sans-serif';
+    tCtx.textAlign = 'left';
+    tCtx.fillText('v' + (si + 1), pad.l + pW + 3, midY - vEnd * yScale + 4);
+  });
+
+  // Sum waveform
+  if (signals.length > 1) {
+    tCtx.strokeStyle = SUM_COLOR;
+    tCtx.lineWidth = 2.5;
+    tCtx.shadowColor = SUM_COLOR;
+    tCtx.shadowBlur = 4;
+    tCtx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * tWindow;
+      let sum = 0;
+      signals.forEach(s => {
+        sum += s.amp * Math.sin(omega * t + s.phase * Math.PI / 180);
+      });
+      const x = pad.l + (i / steps) * pW;
+      const y = midY - sum * yScale;
+      i === 0 ? tCtx.moveTo(x, y) : tCtx.lineTo(x, y);
+    }
+    tCtx.stroke();
+    tCtx.shadowBlur = 0;
+
+    tCtx.fillStyle = SUM_COLOR;
+    tCtx.font = 'bold 10px sans-serif';
+    tCtx.textAlign = 'left';
+    let sumEnd = 0;
+    signals.forEach(s => sumEnd += s.amp * Math.sin(omega * tWindow + s.phase * Math.PI / 180));
+    tCtx.fillText('Σ', pad.l + pW + 3, midY - sumEnd * yScale + 4);
+  }
+
+  // Current time marker
+  const tNorm = (time % tWindow) / tWindow;
+  const markerX = pad.l + tNorm * pW;
+  tCtx.strokeStyle = '#ffa65750';
+  tCtx.lineWidth = 2;
+  tCtx.setLineDash([4, 4]);
+  tCtx.beginPath(); tCtx.moveTo(markerX, pad.t); tCtx.lineTo(markerX, pad.t + pH); tCtx.stroke();
+  tCtx.setLineDash([]);
+
+  // Dots at current time
+  const tNow = time % tWindow;
+  signals.forEach((s, si) => {
+    const v = s.amp * Math.sin(omega * tNow + s.phase * Math.PI / 180);
+    const y = midY - v * yScale;
+    tCtx.beginPath();
+    tCtx.arc(markerX, y, 5, 0, Math.PI * 2);
+    tCtx.fillStyle = s.color;
+    tCtx.fill();
+    tCtx.strokeStyle = '#0d1117';
+    tCtx.lineWidth = 1.5;
+    tCtx.stroke();
+  });
+
+  // Sum dot
+  if (signals.length > 1) {
+    let sumNow = 0;
+    signals.forEach(s => sumNow += s.amp * Math.sin(omega * tNow + s.phase * Math.PI / 180));
+    const sy = midY - sumNow * yScale;
+    tCtx.beginPath();
+    tCtx.arc(markerX, sy, 6, 0, Math.PI * 2);
+    tCtx.fillStyle = SUM_COLOR;
+    tCtx.fill();
+    tCtx.strokeStyle = '#0d1117';
+    tCtx.lineWidth = 2;
+    tCtx.stroke();
+  }
+
+  // Connection lines from dots to phasor canvas (conceptual - draw at left edge)
+  signals.forEach((s, si) => {
+    const v = s.amp * Math.sin(omega * tNow + s.phase * Math.PI / 180);
+    const y = midY - v * yScale;
+    tCtx.strokeStyle = s.color + '30';
+    tCtx.lineWidth = 1;
+    tCtx.setLineDash([3, 5]);
+    tCtx.beginPath(); tCtx.moveTo(pad.l, y); tCtx.lineTo(pad.l - 15, y); tCtx.stroke();
+    tCtx.setLineDash([]);
+  });
+
+  // Amplitude / phase annotations for first two signals
+  if (signals.length >= 1) {
+    const s0 = signals[0];
+    // Show Vm bracket
+    const peakX = pad.l + (((Math.PI / 2 - s0.phase * Math.PI / 180) / omega) % tWindow + tWindow) % tWindow / tWindow * pW;
+    if (peakX > pad.l && peakX < pad.l + pW) {
+      tCtx.strokeStyle = s0.color + '50';
+      tCtx.lineWidth = 1;
+      tCtx.beginPath();
+      tCtx.moveTo(peakX, midY);
+      tCtx.lineTo(peakX, midY - s0.amp * yScale);
+      tCtx.stroke();
+      tCtx.fillStyle = s0.color;
+      tCtx.font = '9px sans-serif';
+      tCtx.textAlign = 'left';
+      tCtx.fillText('Vm=' + s0.amp.toFixed(2), peakX + 4, midY - s0.amp * yScale / 2);
+    }
+  }
+
+  // Title
+  tCtx.fillStyle = '#8b949e';
+  tCtx.font = '10px sans-serif';
+  tCtx.textAlign = 'center';
+  tCtx.fillText('v(t) = Vm sin(ωt + φ)', pad.l + pW / 2, 12);
+}
+
+/* ===== METERS ===== */
+function updateMeters() {
+  const omega = parseFloat(omegaSlider.value);
+  const wt = omega * time;
+  const mb = document.getElementById('meterBox');
+  mb.innerHTML = '';
+
+  // Sum phasor
+  let sumRe = 0, sumIm = 0;
+  signals.forEach(s => {
+    const phi = s.phase * Math.PI / 180;
+    sumRe += s.amp * Math.cos(phi);
+    sumIm += s.amp * Math.sin(phi);
+  });
+  const sumMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+  const sumPhase = Math.atan2(sumIm, sumRe) * 180 / Math.PI;
+
+  // Current values
+  let sumV = 0;
+  signals.forEach(s => {
+    sumV += s.amp * Math.sin(omega * time + s.phase * Math.PI / 180);
+  });
+
+  const ms = [
+    { l: 'ω', v: omega.toFixed(1) + ' rad/s', c: '#8b949e' },
+    { l: 'ωt', v: ((wt * 180 / Math.PI) % 360).toFixed(1) + '°', c: '#ffa657' },
+    { l: 'T (period)', v: (2 * Math.PI / omega).toFixed(2) + ' s', c: '#8b949e' },
+    { l: 'f', v: (omega / (2 * Math.PI)).toFixed(2) + ' Hz', c: '#8b949e' },
+  ];
+
+  signals.forEach((s, i) => {
+    const v = s.amp * Math.sin(omega * time + s.phase * Math.PI / 180);
+    ms.push({ l: 'v' + (i + 1) + '(t)', v: v.toFixed(3), c: s.color });
+  });
+
+  if (signals.length > 1) {
+    ms.push({ l: 'Σ phasor', v: sumMag.toFixed(2) + '∠' + sumPhase.toFixed(1) + '°', c: SUM_COLOR });
+    ms.push({ l: 'Σv(t)', v: sumV.toFixed(3), c: SUM_COLOR });
+  }
+
+  ms.forEach(m => {
+    mb.innerHTML += `<div class="meter"><div class="ml">${m.l}</div><div class="mv" style="color:${m.c}">${m.v}</div></div>`;
+  });
+}
+
+/* ===== ANIMATION ===== */
+function animate(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.04);
+  lastTs = ts;
+
+  if (!paused) {
+    time += dt * parseFloat(speedSlider.value);
+  }
+
+  drawPhasorPlane();
+  drawTimeDomain();
+  updateMeters();
+  requestAnimationFrame(animate);
+}
+
+buildSignalUI();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
