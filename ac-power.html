@@ -458,77 +458,108 @@ function drawWaveforms() {
 
   const freq = r.f;
   const cycles = 2;
-  const yScale = (H / 2 - 25);
+  const halfH = (H / 2 - 25);
   const Vm = r.Vm, Im = r.Im;
-  const maxVI = Math.max(Vm, 1);
-  const maxP = Vm * Im / 2; // max instantaneous power magnitude
 
-  // p(t) fill — show positive (green) and negative (red) regions
-  const pScale = yScale * 0.8 / (maxP || 1);
-  for (let i = 0; i < plotW; i++) {
-    const t = (i / plotW) * cycles / freq + time;
-    const v = Vm * Math.sin(2 * PI * freq * t);
-    const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
-    const p = v * ic;
-    const py = midY - p * pScale;
-    const x = plotL + i;
-    if (p > 0) {
+  // Handle DC (freq=0): show flat lines
+  if (freq <= 0) {
+    // DC: v = Vm (constant), i = Im (constant), p = Vm*Im (constant)
+    const dcP = Vm * Im;
+    // v(t) line
+    const vY = midY - halfH * 0.5;
+    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(plotL, vY); ctx.lineTo(plotR, vY); ctx.stroke();
+    ctx.fillStyle = '#58a6ff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('v = ' + fmt(Vm) + ' V (DC)', plotL + 10, vY - 8);
+    // i(t) line
+    const iY = midY - halfH * 0.25;
+    ctx.strokeStyle = '#f97583'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(plotL, iY); ctx.lineTo(plotR, iY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f97583'; ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('i = ' + fmt(Im) + ' A (DC)', plotL + 10, iY - 8);
+    // p(t) line = P_avg
+    if (dcP > 0) {
+      const pY = midY - halfH * 0.7;
+      ctx.strokeStyle = '#d29922'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(plotL, pY); ctx.lineTo(plotR, pY); ctx.stroke();
+      ctx.fillStyle = '#d29922'; ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('p = P_avg = ' + fmt(r.P) + ' W', plotL + 10, pY - 8);
       ctx.fillStyle = '#3fb95018';
-      ctx.fillRect(x, py, 1, midY - py);
-    } else {
-      ctx.fillStyle = '#f9758318';
-      ctx.fillRect(x, midY, 1, py - midY);
+      ctx.fillRect(plotL, pY, plotW, midY - pY);
     }
-  }
+  } else {
+    // ── Compute global max for p(t) scaling ──
+    // p(t) = (Vm·Im/2)[cosθ − cos(2ωt−θ)], peak = (Vm·Im/2)(1+|cosθ|)
+    const maxP = Math.max(Vm * Im, 1);
+    const pScale = halfH * 0.8 / maxP;
 
-  // p(t) line
-  ctx.strokeStyle = '#d29922'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i <= plotW; i++) {
-    const t = (i / plotW) * cycles / freq + time;
-    const v = Vm * Math.sin(2 * PI * freq * t);
-    const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
-    const p = v * ic;
-    const x = plotL + i;
-    const y = midY - p * pScale;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+    // ── p(t) fill — green when p>0, red when p<0 ──
+    for (let i = 0; i < plotW; i++) {
+      const t = (i / plotW) * cycles / freq + time;
+      const v = Vm * Math.sin(2 * PI * freq * t);
+      const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
+      const p = v * ic;
+      const py = midY - p * pScale;
+      const x = plotL + i;
+      if (p > 0) {
+        ctx.fillStyle = '#3fb95018';
+        ctx.fillRect(x, py, 1, midY - py);
+      } else {
+        ctx.fillStyle = '#f9758318';
+        ctx.fillRect(x, midY, 1, py - midY);
+      }
+    }
 
-  // Average power line P
-  const pAvgY = midY - r.P * pScale;
-  ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
-  ctx.beginPath(); ctx.moveTo(plotL, pAvgY); ctx.lineTo(plotR, pAvgY); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#3fb950'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('P_avg = ' + fmt(r.P) + ' W', plotR - 130, pAvgY - 6);
+    // ── p(t) line ──
+    ctx.strokeStyle = '#d29922'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles / freq + time;
+      const v = Vm * Math.sin(2 * PI * freq * t);
+      const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
+      const p = v * ic;
+      const x = plotL + i;
+      const y = midY - p * pScale;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
 
-  // v(t) line
-  const vScale = yScale * 0.6 / maxVI;
-  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i <= plotW; i++) {
-    const t = (i / plotW) * cycles / freq + time;
-    const v = Vm * Math.sin(2 * PI * freq * t);
-    const x = plotL + i;
-    const y = midY - v * vScale;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+    // ── Average power line P ──
+    const pAvgY = midY - r.P * pScale;
+    ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(plotL, pAvgY); ctx.lineTo(plotR, pAvgY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3fb950'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('P_avg = ' + fmt(r.P) + ' W', plotR - 130, pAvgY - 6);
 
-  // i(t) line
-  const iScale = yScale * 0.6 / (Im || 1);
-  ctx.strokeStyle = '#f97583'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  for (let i = 0; i <= plotW; i++) {
-    const t = (i / plotW) * cycles / freq + time;
-    const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
-    const x = plotL + i;
-    const y = midY - ic * iScale;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    // ── v(t) line ──
+    const vScale = halfH * 0.6 / Math.max(Vm, 1);
+    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles / freq + time;
+      const v = Vm * Math.sin(2 * PI * freq * t);
+      const x = plotL + i;
+      const y = midY - v * vScale;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // ── i(t) line ──
+    const iScale = halfH * 0.6 / Math.max(Im, 0.01);
+    ctx.strokeStyle = '#f97583'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles / freq + time;
+      const ic = Im * Math.sin(2 * PI * freq * t - r.theta);
+      const x = plotL + i;
+      const y = midY - ic * iScale;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
 
   // Legend
   ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left';
