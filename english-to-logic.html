@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>English to Boolean Function — Digital Logic</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:18px}
+  h1{font-size:1.5em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.92em;text-align:center;max-width:860px}
+
+  .tabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+  .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.86em;
+    background:#161b22;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .tab:hover{border-color:#58a6ff;color:#e6edf3}
+  .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+
+  .main{max-width:1100px;width:100%;margin-top:10px}
+  .row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:14px}
+  .panel{background:#161b22;border-radius:12px;padding:16px;border:1px solid #30363d;flex:1;min-width:300px}
+  .panel h2{font-size:.95em;color:#8b949e;margin-bottom:10px;text-align:center}
+
+  /* Keyword reference */
+  .kw-table{border-collapse:collapse;width:100%;font-size:.88em}
+  .kw-table th{background:#21262d;color:#8b949e;padding:6px 10px;border:1px solid #30363d;font-size:.8em;text-align:left}
+  .kw-table td{padding:6px 10px;border:1px solid #30363d}
+  .kw-table .kw{color:#f0883e;font-weight:bold}
+  .kw-table .sym{color:#3fb950;font-family:'Courier New',monospace;font-weight:bold;font-size:1.1em}
+
+  /* Example cards */
+  .example{background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:14px 18px;margin-bottom:12px;cursor:pointer;transition:.2s}
+  .example:hover{border-color:#58a6ff}
+  .example.active{border-color:#1f6feb;box-shadow:0 0 8px #1f6feb30}
+  .example .eng{font-size:1em;color:#e6edf3;margin-bottom:6px;line-height:1.5}
+  .example .eng .kw-hl{color:#f0883e;font-weight:bold;text-decoration:underline;text-decoration-color:#f0883e40}
+  .example .eng .var-hl{color:#58a6ff;font-weight:bold}
+  .example .tag{font-size:.72em;color:#7d8590;background:#21262d;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px}
+
+  /* Step breakdown */
+  .steps{margin-top:6px}
+  .step{padding:6px 0;border-bottom:1px solid #21262d;font-size:.88em;line-height:1.6;opacity:0.3;transition:opacity .3s}
+  .step.visible{opacity:1}
+  .step .num{color:#1f6feb;font-weight:bold;margin-right:6px}
+  .step .arrow{color:#8b949e}
+  .step .var{color:#58a6ff;font-weight:bold}
+  .step .op{color:#f0883e;font-weight:bold}
+  .step .result{color:#3fb950;font-family:'Courier New',monospace;font-weight:bold}
+
+  /* Result box */
+  .result-box{background:#0d1117;border:2px solid #3fb950;border-radius:10px;padding:14px 20px;text-align:center;margin-top:10px}
+  .result-box .label{font-size:.8em;color:#8b949e;margin-bottom:4px}
+  .result-box .fn{font-size:1.4em;font-family:'Courier New',monospace;color:#3fb950;font-weight:bold;letter-spacing:1px}
+
+  /* Truth table */
+  .tt-wrap{overflow-x:auto;margin-top:10px}
+  .tt{border-collapse:collapse;width:100%;font-size:.85em;font-family:'Courier New',monospace}
+  .tt th{background:#21262d;color:#8b949e;padding:5px 8px;border:1px solid #30363d;font-size:.78em}
+  .tt td{padding:5px 8px;border:1px solid #30363d;text-align:center}
+  .tt td.v1{color:#3fb950;font-weight:bold}
+  .tt td.v0{color:#484f58}
+  .tt .sep{border-left:2px solid #58a6ff}
+
+  /* Practice */
+  .practice-sentence{font-size:1.1em;color:#e6edf3;text-align:center;padding:14px;
+    background:#0d1117;border:1px solid #30363d;border-radius:10px;margin-bottom:12px;line-height:1.6}
+  .practice-sentence .kw-hl{color:#f0883e;font-weight:bold}
+  .practice-sentence .var-hl{color:#58a6ff;font-weight:bold}
+  .practice-input{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .practice-input input{background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;
+    padding:10px 16px;font-size:1.1em;font-family:'Courier New',monospace;width:260px;text-align:center}
+  .practice-input input:focus{border-color:#58a6ff;outline:none}
+  button{background:#238636;color:white;border:none;padding:7px 16px;border-radius:6px;
+    cursor:pointer;font-size:.85em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d}
+  button.sec:hover{background:#484f58}
+  .btn-row{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .feedback{text-align:center;font-size:1em;padding:10px;border-radius:8px;margin-top:8px;min-height:40px}
+  .feedback.correct{color:#3fb950;background:#3fb95015;border:1px solid #3fb95040}
+  .feedback.wrong{color:#f97583;background:#f9758315;border:1px solid #f9758340}
+  .feedback.hint{color:#d29922;background:#d2992215;border:1px solid #d2992240}
+
+  .section{display:none}
+  .section.active{display:block}
+
+  .info{max-width:800px;width:100%;margin-top:16px;padding:14px 18px;
+    background:#161b22;border-radius:12px;border:1px solid #30363d;font-size:.85em;line-height:1.7;color:#8b949e}
+  .info a{color:#58a6ff;text-decoration:none}
+  .info a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>English → Boolean Function</h1>
+<p class="subtitle">Learn to translate English sentences into Boolean logic expressions by identifying variables, operators, and structure.</p>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">Keyword Reference</div>
+  <div class="tab" onclick="switchTab(1)">Worked Examples</div>
+  <div class="tab" onclick="switchTab(2)">Practice</div>
+</div>
+
+<!-- ═══════ TAB 0: REFERENCE ═══════ -->
+<div class="section active" id="sec0">
+<div class="main">
+  <div class="row">
+    <div class="panel" style="max-width:520px">
+      <h2>English → Boolean Operator Mapping</h2>
+      <table class="kw-table">
+        <thead><tr><th>English Keywords</th><th>Boolean Operator</th><th>Symbol</th></tr></thead>
+        <tbody>
+          <tr><td class="kw">AND, both, all, together, as well as, while</td><td>AND (conjunction)</td><td class="sym">A · B</td></tr>
+          <tr><td class="kw">OR, either, any, at least one</td><td>OR (disjunction)</td><td class="sym">A + B</td></tr>
+          <tr><td class="kw">NOT, no, never, isn't, don't, without, unless</td><td>NOT (complement)</td><td class="sym">A'</td></tr>
+          <tr><td class="kw">but not, except, and not</td><td>AND NOT</td><td class="sym">A · B'</td></tr>
+          <tr><td class="kw">if and only if, exactly when, same as</td><td>XNOR (equivalence)</td><td class="sym">A ⊙ B</td></tr>
+          <tr><td class="kw">either...or (but not both)</td><td>XOR (exclusive-or)</td><td class="sym">A ⊕ B</td></tr>
+          <tr><td class="kw">neither...nor</td><td>NOR</td><td class="sym">(A + B)'</td></tr>
+          <tr><td class="kw">not both, nand</td><td>NAND</td><td class="sym">(A · B)'</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel" style="max-width:520px">
+      <h2>Translation Steps</h2>
+      <div style="font-size:.9em;line-height:2;color:#c9d1d9">
+        <div><span style="color:#1f6feb;font-weight:bold">Step 1:</span> <span style="color:#58a6ff">Identify the variables</span> — what are the conditions or inputs? Assign a letter to each.</div>
+        <div><span style="color:#1f6feb;font-weight:bold">Step 2:</span> <span style="color:#f0883e">Identify the operators</span> — find keywords like AND, OR, NOT in the sentence.</div>
+        <div><span style="color:#1f6feb;font-weight:bold">Step 3:</span> <span style="color:#3fb950">Build the expression</span> — combine variables with operators, respecting grouping and precedence (NOT > AND > OR).</div>
+        <div><span style="color:#1f6feb;font-weight:bold">Step 4:</span> <span style="color:#d2a8ff">Verify</span> — check a few cases mentally: does the function give the right output?</div>
+      </div>
+
+      <div style="margin-top:14px;padding:10px 14px;background:#0d1117;border-radius:8px;border:1px solid #30363d;font-size:.85em;color:#8b949e">
+        <strong style="color:#d29922">Tip — Precedence:</strong> NOT binds tightest, then AND, then OR.<br>
+        "A or B and not C" → A + B·C' &nbsp;(not (A+B)·C')
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════ TAB 1: WORKED EXAMPLES ═══════ -->
+<div class="section" id="sec1">
+<div class="main">
+  <div class="row">
+    <div class="panel" style="max-width:560px">
+      <h2>Select an Example</h2>
+      <div id="exampleList"></div>
+    </div>
+
+    <div class="panel" style="max-width:520px">
+      <h2>Step-by-Step Translation</h2>
+      <div id="stepsBox"></div>
+      <div class="btn-row">
+        <button onclick="nextExStep()">Next Step</button>
+        <button class="sec" onclick="showAllExSteps()">Show All</button>
+        <button class="sec" onclick="resetExSteps()">Reset</button>
+      </div>
+      <div id="resultBox"></div>
+      <div class="tt-wrap" id="ttBox"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════ TAB 2: PRACTICE ═══════ -->
+<div class="section" id="sec2">
+<div class="main">
+  <div class="row">
+    <div class="panel" style="max-width:700px">
+      <h2>Translate the Sentence</h2>
+      <div class="practice-sentence" id="practSentence"></div>
+      <div class="practice-input">
+        <span style="color:#8b949e;font-size:.9em">F =</span>
+        <input type="text" id="practInput" placeholder="e.g. A·B + C'" onkeydown="if(event.key==='Enter')checkAnswer()">
+        <button onclick="checkAnswer()">Check</button>
+      </div>
+      <div class="feedback" id="practFeedback"></div>
+      <div class="btn-row">
+        <button class="sec" onclick="showHint()">Hint</button>
+        <button class="sec" onclick="showPractAnswer()">Show Answer</button>
+        <button onclick="nextPractice()">Next Question</button>
+      </div>
+      <div style="margin-top:12px;font-size:.8em;color:#7d8590;text-align:center">
+        Use: · or * for AND &nbsp;|&nbsp; + for OR &nbsp;|&nbsp; ' for NOT &nbsp;|&nbsp; ⊕ or ^ for XOR &nbsp;|&nbsp; parentheses for grouping
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="info">
+  <strong>Key Concept:</strong> Every English specification of a digital system can be translated into a Boolean function. Identify the inputs (variables), the output condition, and the logical relationships (AND, OR, NOT) between them.<br>
+  <strong>Common Pitfall:</strong> "unless" means "if not" — e.g., "F is true unless A is false" → F = A.<br>
+  <strong>Precedence:</strong> NOT (highest) → AND → OR (lowest). Use parentheses when in doubt.<br><br>
+  <a href="index.html">&larr; All Demos</a> &middot;
+  <a href="kmap.html">K-Map Simplifier</a> &middot;
+  <a href="boolean-theorems.html">Absorption &amp; Elimination</a> &middot;
+  <a href="xor-xnor.html">XOR &amp; XNOR Gates</a>
+</div>
+
+<script>
+// ── Tab switching ──
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.section').forEach((s, i) => s.classList.toggle('active', i === idx));
+}
+
+// ═══════════════════════════════════════
+// WORKED EXAMPLES
+// ═══════════════════════════════════════
+const examples = [
+  {
+    tag: '2 variables · AND',
+    eng: 'The alarm sounds when the door is <span class="var-hl">open</span> <span class="kw-hl">and</span> the system is <span class="var-hl">armed</span>.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">D</span> = door is open, <span class="var">A</span> = system is armed' },
+      { text: '<span class="num">2.</span> Keyword "<span class="op">and</span>" → AND operator (·)' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">D · A</span>' },
+      { text: '<span class="num">4.</span> Verify: alarm sounds only when both D=1 AND A=1 ✓' },
+    ],
+    fn: 'F = D · A',
+    vars: ['D', 'A'],
+    eval: (v) => v[0] & v[1],
+  },
+  {
+    tag: '2 variables · OR',
+    eng: 'The sprinkler activates if <span class="kw-hl">either</span> the <span class="var-hl">smoke detector</span> <span class="kw-hl">or</span> the <span class="var-hl">heat sensor</span> triggers.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">S</span> = smoke detector triggers, <span class="var">H</span> = heat sensor triggers' },
+      { text: '<span class="num">2.</span> Keywords "<span class="op">either...or</span>" → OR operator (+) &nbsp;<span style="color:#7d8590">(not exclusive here — "either or" in everyday English usually means inclusive OR)</span>' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">S + H</span>' },
+      { text: '<span class="num">4.</span> Verify: sprinkler on when S=1, H=0 → F=1 ✓; both=1 → F=1 ✓' },
+    ],
+    fn: 'F = S + H',
+    vars: ['S', 'H'],
+    eval: (v) => v[0] | v[1],
+  },
+  {
+    tag: '2 variables · AND NOT',
+    eng: 'The motor runs when power is <span class="var-hl">on</span> <span class="kw-hl">and</span> the emergency stop is <span class="kw-hl">not</span> <span class="var-hl">pressed</span>.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">P</span> = power is on, <span class="var">E</span> = emergency stop is pressed' },
+      { text: '<span class="num">2.</span> Keywords "<span class="op">and</span>" → AND; "<span class="op">not</span> pressed" → complement of E' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">P · E\'</span>' },
+      { text: '<span class="num">4.</span> Verify: P=1,E=0 → F=1 (runs) ✓; P=1,E=1 → F=0 (stopped) ✓' },
+    ],
+    fn: "F = P · E'",
+    vars: ['P', 'E'],
+    eval: (v) => v[0] & (~v[1] & 1),
+  },
+  {
+    tag: '3 variables · AND + OR',
+    eng: 'The light turns on when <span class="var-hl">switch A</span> <span class="kw-hl">and</span> <span class="var-hl">switch B</span> are both on, <span class="kw-hl">or</span> the <span class="var-hl">master override</span> is on.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">A</span> = switch A, <span class="var">B</span> = switch B, <span class="var">M</span> = master override' },
+      { text: '<span class="num">2.</span> "<span class="op">and</span>" → AND between A,B; "<span class="op">or</span>" → OR with M' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">A·B + M</span> &nbsp;<span style="color:#7d8590">(AND has higher precedence than OR)</span>' },
+      { text: '<span class="num">4.</span> Verify: A=1,B=1,M=0 → F=1 ✓; A=0,B=0,M=1 → F=1 ✓' },
+    ],
+    fn: 'F = A·B + M',
+    vars: ['A', 'B', 'M'],
+    eval: (v) => (v[0] & v[1]) | v[2],
+  },
+  {
+    tag: '3 variables · NOT + OR + AND',
+    eng: 'Access is granted when the <span class="var-hl">badge</span> is valid <span class="kw-hl">and</span> the <span class="var-hl">PIN</span> is correct, <span class="kw-hl">or</span> the user has <span class="var-hl">admin</span> access <span class="kw-hl">but</span> the system is <span class="kw-hl">not</span> in <span class="var-hl">lockdown</span>.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">B</span> = badge valid, <span class="var">P</span> = PIN correct, <span class="var">A</span> = admin access, <span class="var">L</span> = lockdown' },
+      { text: '<span class="num">2.</span> "badge <span class="op">and</span> PIN" → B·P; "<span class="op">or</span>" → +; "admin <span class="op">but not</span> lockdown" → A·L\'' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">B·P + A·L\'</span>' },
+      { text: '<span class="num">4.</span> Verify: B=1,P=1,A=0,L=0 → F=1 ✓; B=0,P=0,A=1,L=0 → F=1 ✓; A=1,L=1 → second term=0 ✓' },
+    ],
+    fn: "F = B·P + A·L'",
+    vars: ['B', 'P', 'A', 'L'],
+    eval: (v) => (v[0] & v[1]) | (v[2] & (~v[3] & 1)),
+  },
+  {
+    tag: '3 variables · NOR',
+    eng: 'The error flag is set when <span class="kw-hl">neither</span> <span class="var-hl">sensor A</span> <span class="kw-hl">nor</span> <span class="var-hl">sensor B</span> detects a signal.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">A</span> = sensor A detects, <span class="var">B</span> = sensor B detects' },
+      { text: '<span class="num">2.</span> "<span class="op">neither...nor</span>" → NOR = (A + B)\' = A\'·B\'' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">(A + B)\'</span> = <span class="result">A\'·B\'</span>' },
+      { text: '<span class="num">4.</span> Verify: A=0,B=0 → F=1 (error) ✓; A=1,B=0 → F=0 ✓' },
+    ],
+    fn: "F = (A+B)' = A'·B'",
+    vars: ['A', 'B'],
+    eval: (v) => (~(v[0] | v[1])) & 1,
+  },
+  {
+    tag: '2 variables · XOR',
+    eng: 'The output is high when <span class="var-hl">input A</span> <span class="kw-hl">and</span> <span class="var-hl">input B</span> are <span class="kw-hl">different</span>.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">A</span> = input A, <span class="var">B</span> = input B' },
+      { text: '<span class="num">2.</span> "are <span class="op">different</span>" → XOR operation (⊕)' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">A ⊕ B</span> = <span class="result">A\'B + AB\'</span>' },
+      { text: '<span class="num">4.</span> Verify: A=0,B=1 → F=1 ✓; A=1,B=1 → F=0 ✓' },
+    ],
+    fn: "F = A ⊕ B",
+    vars: ['A', 'B'],
+    eval: (v) => v[0] ^ v[1],
+  },
+  {
+    tag: '3 variables · complex',
+    eng: 'The valve opens when <span class="var-hl">pressure</span> is high <span class="kw-hl">or</span> <span class="var-hl">temperature</span> is high, <span class="kw-hl">but only if</span> the <span class="var-hl">safety lock</span> is <span class="kw-hl">not</span> engaged.',
+    steps: [
+      { text: '<span class="num">1.</span> Identify variables: <span class="var">P</span> = pressure high, <span class="var">T</span> = temperature high, <span class="var">S</span> = safety lock engaged' },
+      { text: '<span class="num">2.</span> "P <span class="op">or</span> T" → (P+T); "<span class="op">but only if</span> ... <span class="op">not</span>" → AND with S\'' },
+      { text: '<span class="num">3.</span> Build: F = <span class="result">(P + T) · S\'</span>' },
+      { text: '<span class="num">4.</span> Verify: P=1,T=0,S=0 → F=1 ✓; P=1,T=1,S=1 → F=0 (locked) ✓' },
+    ],
+    fn: "F = (P+T)·S'",
+    vars: ['P', 'T', 'S'],
+    eval: (v) => (v[0] | v[1]) & (~v[2] & 1),
+  },
+];
+
+let currentEx = 0, exStep = 0;
+
+function buildExampleList() {
+  let html = '';
+  examples.forEach((ex, i) => {
+    html += '<div class="example' + (i === 0 ? ' active' : '') + '" onclick="selectExample(' + i + ')" id="ex' + i + '">';
+    html += '<span class="tag">' + ex.tag + '</span>';
+    html += '<div class="eng">' + ex.eng + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('exampleList').innerHTML = html;
+}
+
+function selectExample(i) {
+  currentEx = i; exStep = 0;
+  document.querySelectorAll('.example').forEach((e, j) => e.classList.toggle('active', j === i));
+  buildExSteps();
+}
+
+function buildExSteps() {
+  const ex = examples[currentEx];
+  let html = '<div class="steps">';
+  ex.steps.forEach((s, i) => {
+    html += '<div class="step' + (i === 0 ? ' visible' : '') + '" id="exs' + i + '">' + s.text + '</div>';
+  });
+  html += '</div>';
+  document.getElementById('stepsBox').innerHTML = html;
+  exStep = 0;
+
+  // Show result and truth table only if all steps visible
+  document.getElementById('resultBox').innerHTML = '';
+  document.getElementById('ttBox').innerHTML = '';
+}
+
+function nextExStep() {
+  const ex = examples[currentEx];
+  if (exStep < ex.steps.length - 1) {
+    exStep++;
+    document.getElementById('exs' + exStep).classList.add('visible');
+  }
+  if (exStep === ex.steps.length - 1) showExResult();
+}
+
+function showAllExSteps() {
+  const ex = examples[currentEx];
+  for (let i = 0; i < ex.steps.length; i++)
+    document.getElementById('exs' + i).classList.add('visible');
+  exStep = ex.steps.length - 1;
+  showExResult();
+}
+
+function resetExSteps() {
+  const ex = examples[currentEx];
+  for (let i = 1; i < ex.steps.length; i++)
+    document.getElementById('exs' + i).classList.remove('visible');
+  exStep = 0;
+  document.getElementById('resultBox').innerHTML = '';
+  document.getElementById('ttBox').innerHTML = '';
+}
+
+function showExResult() {
+  const ex = examples[currentEx];
+  document.getElementById('resultBox').innerHTML =
+    '<div class="result-box"><div class="label">Boolean Function</div><div class="fn">' + ex.fn + '</div></div>';
+
+  // Truth table
+  const n = ex.vars.length;
+  const rows = 1 << n;
+  let html = '<table class="tt"><thead><tr>';
+  ex.vars.forEach(v => html += '<th>' + v + '</th>');
+  html += '<th class="sep">F</th></tr></thead><tbody>';
+  for (let i = 0; i < rows; i++) {
+    html += '<tr>';
+    const bits = [];
+    for (let j = n - 1; j >= 0; j--) {
+      const b = (i >> j) & 1;
+      bits.push(b);
+      html += '<td class="v' + b + '">' + b + '</td>';
+    }
+    const out = ex.eval(bits);
+    html += '<td class="v' + out + ' sep">' + out + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('ttBox').innerHTML = html;
+}
+
+// ═══════════════════════════════════════
+// PRACTICE
+// ═══════════════════════════════════════
+const practiceQs = [
+  {
+    sentence: 'The fan turns on when it is <span class="kw-hl">both</span> <span class="var-hl">hot</span> <span class="kw-hl">and</span> <span class="var-hl">humid</span>.',
+    answer: ['H*U', 'H·U', 'HU', 'H.U', 'H AND U'],
+    display: 'F = H · U',
+    hint: 'Two conditions joined by AND. Let H = hot, U = humid.',
+  },
+  {
+    sentence: 'The alert triggers if <span class="var-hl">voltage</span> is low <span class="kw-hl">or</span> <span class="var-hl">current</span> is high.',
+    answer: ['V+C', 'V+I', 'V OR C', 'V OR I'],
+    display: 'F = V + C',
+    hint: 'Two conditions joined by OR. Let V = voltage low, C = current high.',
+  },
+  {
+    sentence: 'The gate opens when the <span class="var-hl">key</span> is inserted <span class="kw-hl">and</span> the <span class="var-hl">code</span> is correct, <span class="kw-hl">or</span> the <span class="var-hl">override</span> is active.',
+    answer: ["K*C+O", "K·C+O", "KC+O", "K.C+O", "K*C+V", "K·C+V"],
+    display: 'F = K·C + O',
+    hint: '"key AND code" forms one term, "OR override" adds another. Precedence: AND before OR.',
+  },
+  {
+    sentence: 'The heater is off when the <span class="var-hl">thermostat</span> reads normal <span class="kw-hl">or</span> the <span class="var-hl">power</span> is <span class="kw-hl">not</span> connected.',
+    answer: ["T+P'", "T+P\\'", "T+!P", "T+NOT P", "T OR P'"],
+    display: "F = T + P'",
+    hint: "Let T = thermostat normal, P = power connected. 'not connected' means P'.",
+  },
+  {
+    sentence: '<span class="kw-hl">Neither</span> <span class="var-hl">button A</span> <span class="kw-hl">nor</span> <span class="var-hl">button B</span> is pressed.',
+    answer: ["(A+B)'", "A'·B'", "A'B'", "A'*B'", "!A*!B", "!A·!B"],
+    display: "F = (A+B)' = A'·B'",
+    hint: '"Neither...nor" is NOR. By De Morgan\'s: (A+B)\' = A\'·B\'.',
+  },
+  {
+    sentence: 'The output is 1 when <span class="var-hl">A</span> <span class="kw-hl">and</span> <span class="var-hl">B</span> are <span class="kw-hl">different</span>.',
+    answer: ["A⊕B", "A^B", "A XOR B", "A'B+AB'", "A'·B+A·B'"],
+    display: 'F = A ⊕ B',
+    hint: '"Different" means one is 0 and the other is 1 → XOR.',
+  },
+  {
+    sentence: 'The system resets if <span class="var-hl">error</span> occurs <span class="kw-hl">and</span> <span class="var-hl">auto-recovery</span> is enabled, <span class="kw-hl">but not</span> during <span class="var-hl">maintenance</span>.',
+    answer: ["E*A*M'", "E·A·M'", "EAM'", "E·A·(!M)", "E*A*!M"],
+    display: "F = E·A·M'",
+    hint: "Three variables. AND them all, with maintenance complemented (NOT).",
+  },
+  {
+    sentence: 'The light is on when <span class="var-hl">switch A</span> <span class="kw-hl">or</span> <span class="var-hl">switch B</span> is on, <span class="kw-hl">but only if</span> the <span class="var-hl">breaker</span> is <span class="kw-hl">not</span> tripped.',
+    answer: ["(A+B)*C'", "(A+B)·C'", "(A+B)C'", "(A+B)*!C", "(A+B)·(!C)", "(A+B)·B'"],
+    display: "F = (A+B)·C'",
+    hint: '"A or B" is grouped, then AND with NOT breaker. Use parentheses for (A+B).',
+  },
+];
+
+let practIdx = 0;
+let practRevealed = false;
+
+function loadPractice() {
+  const q = practiceQs[practIdx];
+  document.getElementById('practSentence').innerHTML = q.sentence;
+  document.getElementById('practInput').value = '';
+  document.getElementById('practFeedback').innerHTML = '';
+  document.getElementById('practFeedback').className = 'feedback';
+  practRevealed = false;
+}
+
+function normalize(s) {
+  return s.replace(/\s+/g, '').replace(/[·•]/g, '*').replace(/!/g, "'").toUpperCase();
+}
+
+function checkAnswer() {
+  const q = practiceQs[practIdx];
+  const input = document.getElementById('practInput').value.trim();
+  if (!input) return;
+
+  const normInput = normalize(input);
+  const match = q.answer.some(a => normalize(a) === normInput);
+
+  const fb = document.getElementById('practFeedback');
+  if (match) {
+    fb.innerHTML = 'Correct! &nbsp;' + q.display;
+    fb.className = 'feedback correct';
+  } else {
+    fb.innerHTML = 'Not quite. Try again or click "Show Answer".';
+    fb.className = 'feedback wrong';
+  }
+}
+
+function showHint() {
+  const q = practiceQs[practIdx];
+  const fb = document.getElementById('practFeedback');
+  fb.innerHTML = q.hint;
+  fb.className = 'feedback hint';
+}
+
+function showPractAnswer() {
+  const q = practiceQs[practIdx];
+  const fb = document.getElementById('practFeedback');
+  fb.innerHTML = 'Answer: &nbsp;<strong style="color:#3fb950;font-family:monospace;font-size:1.1em">' + q.display + '</strong>';
+  fb.className = 'feedback correct';
+  practRevealed = true;
+}
+
+function nextPractice() {
+  practIdx = (practIdx + 1) % practiceQs.length;
+  loadPractice();
+}
+
+// ── Init ──
+buildExampleList();
+buildExSteps();
+loadPractice();
+</script>
+</body>
+</html>
