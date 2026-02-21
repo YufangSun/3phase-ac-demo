@@ -40,8 +40,8 @@
   .bit-col{display:flex;flex-direction:column;align-items:center;gap:2px}
   .bit-weight{font-size:.65em;color:#484f58}
   .bit-power{font-size:.7em;color:#7d8590}
-  .bit-cell{width:42px;height:42px;display:flex;align-items:center;justify-content:center;
-    border-radius:8px;font-size:1.3em;font-weight:bold;font-family:'Courier New',monospace;
+  .bit-cell{min-width:28px;width:var(--cell-w,42px);height:var(--cell-w,42px);display:flex;align-items:center;justify-content:center;
+    border-radius:8px;font-size:var(--cell-fs,1.3em);font-weight:bold;font-family:'Courier New',monospace;
     cursor:pointer;transition:all .15s;user-select:none}
   .bit-cell.b0{background:#21262d;color:#484f58;border:2px solid #30363d}
   .bit-cell.b1{background:#1f6feb;color:white;border:2px solid #58a6ff;box-shadow:0 0 8px #1f6feb40}
@@ -52,8 +52,8 @@
   /* Step display */
   .steps{margin-top:12px}
   .step-row{display:flex;gap:2px;justify-content:center;margin:2px 0;align-items:center}
-  .step-cell{width:42px;height:36px;display:flex;align-items:center;justify-content:center;
-    font-size:1.1em;font-weight:bold;font-family:'Courier New',monospace;border-radius:4px}
+  .step-cell{min-width:28px;width:var(--cell-w,42px);height:36px;display:flex;align-items:center;justify-content:center;
+    font-size:var(--cell-fs,1.1em);font-weight:bold;font-family:'Courier New',monospace;border-radius:4px}
   .step-label{width:60px;text-align:right;font-size:.8em;color:#8b949e;padding-right:8px}
   .step-sep{height:2px;background:#30363d;margin:4px 0}
   .carry-row .step-cell{font-size:.85em;color:#d29922;height:24px}
@@ -87,6 +87,32 @@
   .eq-symbol{font-size:1.1em;color:#8b949e;margin:0 6px}
   .dec-val{font-family:'Courier New',monospace;font-size:1.1em;color:#f78166}
   .hidden{display:none}
+
+  /* Overflow warning */
+  .overflow-warn{background:#da363318;border:1px solid #da3633;border-radius:8px;
+    padding:10px 14px;margin:8px 0;text-align:center;animation:flashWarn .6s ease}
+  .overflow-warn .ow-title{color:#da3633;font-weight:bold;font-size:.92em;margin-bottom:4px}
+  .overflow-warn .ow-detail{color:#8b949e;font-size:.82em;line-height:1.5}
+  .overflow-warn code{color:#f78166;background:#21262d;padding:1px 4px;border-radius:3px;font-size:.9em}
+  .overflow-ok{background:#3fb95018;border:1px solid #3fb950;border-radius:8px;
+    padding:8px 14px;margin:8px 0;text-align:center}
+  .overflow-ok .ow-title{color:#3fb950;font-weight:bold;font-size:.85em}
+  @keyframes flashWarn{0%{background:#da363340}100%{background:#da363318}}
+
+  /* Bit-length bar */
+  .bitlen-bar{display:flex;gap:8px;align-items:center;justify-content:center;
+    background:#161b22;border:1px solid #30363d;border-radius:10px;
+    padding:8px 16px;margin-bottom:10px;flex-wrap:wrap;max-width:900px;width:100%}
+  .bitlen-bar label{font-size:.82em;color:#8b949e}
+  .bitlen-btn{padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.78em;
+    background:#21262d;border:1px solid #30363d;color:#8b949e;transition:.2s;font-family:'Courier New',monospace}
+  .bitlen-btn:hover{border-color:#58a6ff;color:#e6edf3}
+  .bitlen-btn.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+  .bitlen-custom{width:52px;padding:3px 6px;font-size:.82em;text-align:center;
+    background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;
+    font-family:'Courier New',monospace}
+  .bitlen-custom:focus{border-color:#58a6ff;outline:none}
+  .bitlen-info{font-size:.72em;color:#484f58;margin-left:6px}
 </style>
 </head>
 <body>
@@ -99,6 +125,18 @@
   <div class="tab" data-tab="bin2dec">Binary → Decimal</div>
   <div class="tab" data-tab="add">Binary Addition</div>
   <div class="tab" data-tab="sub">Binary Subtraction</div>
+</div>
+
+<div class="bitlen-bar">
+  <label>Bit Width:</label>
+  <div class="bitlen-btn" data-bits="auto">Auto</div>
+  <div class="bitlen-btn" data-bits="4">4-bit</div>
+  <div class="bitlen-btn active" data-bits="8">8-bit</div>
+  <div class="bitlen-btn" data-bits="16">16-bit</div>
+  <div class="bitlen-btn" data-bits="32">32-bit</div>
+  <div class="bitlen-btn" data-bits="custom">Custom:</div>
+  <input type="number" class="bitlen-custom" id="bitlenCustom" min="1" max="32" value="12" disabled>
+  <span class="bitlen-info" id="bitlenInfo">range: 0 – 255</span>
 </div>
 
 <div class="main">
@@ -118,6 +156,7 @@
       <div class="result-label">Binary Result</div>
       <div class="result-val" id="d2b-result" style="color:#3fb950">—</div>
     </div>
+    <div id="d2b-overflow"></div>
     <div class="div-steps" id="d2b-steps"></div>
     <div class="bits-row" id="d2b-bits"></div>
   </div>
@@ -159,6 +198,7 @@
       <div class="result-label">A + B</div>
       <div class="result-val" id="add-result" style="color:#3fb950">—</div>
     </div>
+    <div id="add-overflow"></div>
     <div class="steps" id="add-steps"></div>
   </div>
 </div>
@@ -188,6 +228,7 @@
       <div class="result-label">A − B</div>
       <div class="result-val" id="sub-result" style="color:#3fb950">—</div>
     </div>
+    <div id="sub-overflow"></div>
     <div class="steps" id="sub-steps"></div>
   </div>
 </div>
@@ -228,6 +269,68 @@ tabs.forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
   document.getElementById('tab-' + t.dataset.tab).classList.remove('hidden');
 }));
+
+// ── Bit-length management ──
+let bitLenMode = '8'; // 'auto', '4', '8', '16', '32', 'custom'
+
+function getBitLen(minNeeded) {
+  if (bitLenMode === 'auto') {
+    // Smallest standard width that fits
+    if (minNeeded <= 4) return 4;
+    if (minNeeded <= 8) return 8;
+    if (minNeeded <= 16) return 16;
+    return 32;
+  }
+  if (bitLenMode === 'custom') {
+    return Math.max(1, Math.min(32, +document.getElementById('bitlenCustom').value || 8));
+  }
+  return +bitLenMode;
+}
+
+function getMaxVal() {
+  if (bitLenMode === 'auto') return (1 << 32) - 1;
+  const bits = getBitLen(1);
+  return (bits >= 32) ? 4294967295 : (1 << bits) - 1;
+}
+
+function updateBitlenInfo() {
+  const maxV = getMaxVal();
+  const bits = bitLenMode === 'auto' ? 'auto' : getBitLen(1);
+  document.getElementById('bitlenInfo').textContent =
+    bitLenMode === 'auto' ? 'auto-fit (4/8/16/32)' : `range: 0 – ${maxV.toLocaleString()}`;
+
+  // Update input max attributes
+  const maxInput = Math.min(maxV, 4294967295);
+  document.querySelectorAll('#d2b-input, #add-a, #add-b, #sub-a, #sub-b').forEach(el => {
+    el.max = maxInput;
+  });
+  // Update b2d maxlength
+  const bl = bitLenMode === 'auto' ? 32 : getBitLen(1);
+  document.getElementById('b2d-input').maxLength = bl;
+
+  // Adjust cell sizes for wider bit widths
+  const b = getBitLen(8);
+  const cellW = b > 16 ? '24px' : b > 8 ? '32px' : '42px';
+  const cellFs = b > 16 ? '0.8em' : b > 8 ? '0.95em' : '1.1em';
+  document.documentElement.style.setProperty('--cell-w', cellW);
+  document.documentElement.style.setProperty('--cell-fs', cellFs);
+}
+
+document.querySelectorAll('.bitlen-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.bitlen-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    bitLenMode = btn.dataset.bits;
+    document.getElementById('bitlenCustom').disabled = (bitLenMode !== 'custom');
+    updateBitlenInfo();
+  });
+});
+
+document.getElementById('bitlenCustom').addEventListener('input', () => {
+  if (bitLenMode === 'custom') updateBitlenInfo();
+});
+
+updateBitlenInfo();
 
 // ── Helpers ──
 function toBin(n, bits) {
@@ -280,13 +383,33 @@ let d2bStepTimer = null;
 
 function d2bConvert(stepping) {
   if (d2bStepTimer) { clearInterval(d2bStepTimer); d2bStepTimer = null; }
-  let dec = Math.max(0, Math.min(255, Math.floor(+document.getElementById('d2b-input').value) || 0));
+  const maxV = getMaxVal();
+  const rawDec = Math.max(0, Math.floor(+document.getElementById('d2b-input').value) || 0);
+  let dec = rawDec;
+  const ovDiv = document.getElementById('d2b-overflow');
+
+  // Overflow detection for fixed bit width
+  if (bitLenMode !== 'auto' && rawDec > maxV) {
+    const bits = getBitLen(1);
+    const truncated = rawDec & ((bits >= 32) ? 0xFFFFFFFF : (1 << bits) - 1);
+    ovDiv.innerHTML = `<div class="overflow-warn">` +
+      `<div class="ow-title">⚠ Overflow — value exceeds ${bits}-bit range</div>` +
+      `<div class="ow-detail">Input <code>${rawDec}</code> &gt; max <code>${maxV}</code> (${bits}-bit unsigned).<br>` +
+      `Truncated to ${bits} bits: <code>${rawDec} mod ${maxV + 1} = ${truncated}</code> → <code>${toBin(truncated, bits)}</code></div>` +
+      `</div>`;
+    dec = truncated;
+  } else {
+    ovDiv.innerHTML = '';
+  }
   document.getElementById('d2b-input').value = dec;
+  const minBits = Math.max(1, Math.ceil(Math.log2((dec || 1) + 1)));
+  const dispBits = getBitLen(minBits);
 
   if (dec === 0) {
-    document.getElementById('d2b-result').textContent = '0';
+    const zBin = '0'.repeat(dispBits);
+    document.getElementById('d2b-result').textContent = zBin + '  (0₁₀)';
     document.getElementById('d2b-steps').innerHTML = '<span class="quo">0</span> ÷ 2 = <span class="quo">0</span> remainder <span class="rem">0</span>';
-    makeBitsRow(document.getElementById('d2b-bits'), '0');
+    makeBitsRow(document.getElementById('d2b-bits'), zBin);
     return;
   }
 
@@ -299,7 +422,8 @@ function d2bConvert(stepping) {
     steps.push({ val, q, r });
     val = q;
   }
-  const binStr = steps.map(s => s.r).reverse().join('');
+  const rawBin = steps.map(s => s.r).reverse().join('');
+  const binStr = rawBin.padStart(dispBits, '0');
 
   if (!stepping) {
     // Show all at once
@@ -346,7 +470,8 @@ function showD2BSteps(steps, count) {
 document.getElementById('d2b-go').onclick = () => d2bConvert(false);
 document.getElementById('d2b-step').onclick = () => d2bConvert(true);
 document.getElementById('d2b-random').onclick = () => {
-  document.getElementById('d2b-input').value = Math.floor(Math.random() * 256);
+  const maxV = Math.min(getMaxVal(), 65535);
+  document.getElementById('d2b-input').value = Math.floor(Math.random() * (maxV + 1));
   d2bConvert(false);
 };
 document.getElementById('d2b-input').addEventListener('keydown', e => { if (e.key === 'Enter') d2bConvert(false); });
@@ -355,9 +480,10 @@ document.getElementById('d2b-input').addEventListener('keydown', e => { if (e.ke
 //  TAB 2: Binary → Decimal
 // ══════════════════════════════════════
 function b2dConvert() {
+  const maxBits = bitLenMode === 'auto' ? 32 : getBitLen(1);
   let binStr = document.getElementById('b2d-input').value.replace(/[^01]/g, '');
   if (binStr.length === 0) binStr = '0';
-  if (binStr.length > 8) binStr = binStr.slice(-8);
+  if (binStr.length > maxBits) binStr = binStr.slice(-maxBits);
   document.getElementById('b2d-input').value = binStr;
 
   const len = binStr.length;
@@ -381,7 +507,8 @@ function b2dConvert() {
   // Interactive bits
   const area = document.getElementById('b2d-bits-area');
   area.innerHTML = '<div class="bits-row" id="b2d-bits"></div>';
-  makeBitsRow(document.getElementById('b2d-bits'), binStr.padStart(8, '0'), {
+  const padBits = getBitLen(binStr.length);
+  makeBitsRow(document.getElementById('b2d-bits'), binStr.padStart(padBits, '0'), {
     clickable: true,
     onToggle: (newBin) => {
       document.getElementById('b2d-input').value = newBin.replace(/^0+/, '') || '0';
@@ -412,7 +539,8 @@ function b2dConvert() {
 
 document.getElementById('b2d-go').onclick = b2dConvert;
 document.getElementById('b2d-random').onclick = () => {
-  const n = Math.floor(Math.random() * 256);
+  const maxV = Math.min(getMaxVal(), 65535);
+  const n = Math.floor(Math.random() * (maxV + 1));
   document.getElementById('b2d-input').value = n.toString(2);
   b2dConvert();
 };
@@ -425,13 +553,22 @@ let addStepTimer = null;
 
 function addCompute(stepping) {
   if (addStepTimer) { clearInterval(addStepTimer); addStepTimer = null; }
-  let a = Math.max(0, Math.min(127, Math.floor(+document.getElementById('add-a').value) || 0));
-  let b = Math.max(0, Math.min(127, Math.floor(+document.getElementById('add-b').value) || 0));
+  const maxV = getMaxVal();
+  let a = Math.max(0, Math.min(maxV, Math.floor(+document.getElementById('add-a').value) || 0));
+  let b = Math.max(0, Math.min(maxV, Math.floor(+document.getElementById('add-b').value) || 0));
   document.getElementById('add-a').value = a;
   document.getElementById('add-b').value = b;
 
+  // Clamp inputs that exceed current bit width
+  if (bitLenMode !== 'auto') {
+    const inputMax = getMaxVal();
+    if (a > inputMax) { a = a & ((getBitLen(1) >= 32) ? 0xFFFFFFFF : (1 << getBitLen(1)) - 1); document.getElementById('add-a').value = a; }
+    if (b > inputMax) { b = b & ((getBitLen(1) >= 32) ? 0xFFFFFFFF : (1 << getBitLen(1)) - 1); document.getElementById('add-b').value = b; }
+  }
+
   const sum = a + b;
-  const bits = Math.max(8, Math.ceil(Math.log2(Math.max(sum, 1) + 1)));
+  const minBits = Math.max(1, Math.ceil(Math.log2(Math.max(a, b, 1) + 1)));
+  const bits = getBitLen(minBits);
   const aBin = toBin(a, bits);
   const bBin = toBin(b, bits);
   const sBin = toBin(sum, bits + 1); // extra bit for overflow
@@ -450,13 +587,36 @@ function addCompute(stepping) {
   }
   const finalCarry = carry;
 
+  // Overflow detection
+  const ovDiv = document.getElementById('add-overflow');
+  const maxResult = (bits >= 32) ? 4294967295 : (1 << bits) - 1;
+  const hasOverflow = sum > maxResult;
+  const truncated = sum & ((bits >= 32) ? 0xFFFFFFFF : (1 << bits) - 1);
+
+  function showOverflow() {
+    if (hasOverflow) {
+      ovDiv.innerHTML = `<div class="overflow-warn">` +
+        `<div class="ow-title">⚠ Overflow — result exceeds ${bits}-bit range</div>` +
+        `<div class="ow-detail">` +
+        `Full result: <code>${a} + ${b} = ${sum}</code> (needs ${Math.ceil(Math.log2(sum + 1))} bits)<br>` +
+        `Truncated to ${bits} bits: <code>${toBin(truncated, bits)}</code> = <code>${truncated}</code><br>` +
+        `Carry-out bit: <code>1</code> (lost if only ${bits} bits stored)` +
+        `</div></div>`;
+    } else {
+      ovDiv.innerHTML = `<div class="overflow-ok"><div class="ow-title">No overflow — result fits in ${bits} bits</div></div>`;
+    }
+  }
+
   if (!stepping) {
     showAddSteps(aBin, bBin, carries, results, finalCarry, bits, bits);
+    showOverflow();
     document.getElementById('add-result').innerHTML =
       `<span style="color:#f78166">${a}</span> + <span style="color:#f78166">${b}</span> = <span style="color:#3fb950">${sum}</span>` +
-      `<br><span style="font-size:.7em;color:#8b949e">${aBin} + ${bBin} = ${toBin(sum, bits + (finalCarry ? 1 : 0))}</span>`;
+      `<br><span style="font-size:.7em;color:#8b949e">${aBin} + ${bBin} = ${toBin(sum, bits + (finalCarry ? 1 : 0))}</span>` +
+      (hasOverflow ? `<br><span style="font-size:.7em;color:#da3633">Truncated ${bits}-bit: ${toBin(truncated, bits)} (${truncated})</span>` : '');
   } else {
     document.getElementById('add-result').textContent = '...';
+    ovDiv.innerHTML = '';
     let step = 0;
     showAddSteps(aBin, bBin, carries, results, finalCarry, bits, -1);
     addStepTimer = setInterval(() => {
@@ -465,9 +625,11 @@ function addCompute(stepping) {
       if (step > bits) {
         clearInterval(addStepTimer);
         addStepTimer = null;
+        showOverflow();
         document.getElementById('add-result').innerHTML =
           `<span style="color:#f78166">${a}</span> + <span style="color:#f78166">${b}</span> = <span style="color:#3fb950">${sum}</span>` +
-          `<br><span style="font-size:.7em;color:#8b949e">${aBin} + ${bBin} = ${toBin(sum, bits + (finalCarry ? 1 : 0))}</span>`;
+          `<br><span style="font-size:.7em;color:#8b949e">${aBin} + ${bBin} = ${toBin(sum, bits + (finalCarry ? 1 : 0))}</span>` +
+          (hasOverflow ? `<br><span style="font-size:.7em;color:#da3633">Truncated ${bits}-bit: ${toBin(truncated, bits)} (${truncated})</span>` : '');
       }
     }, 500);
   }
@@ -523,9 +685,9 @@ function showAddSteps(aBin, bBin, carries, results, finalCarry, bits, revealCol)
   // Result row
   html += '<div class="step-row result-row">';
   html += '<div class="step-label" style="color:#3fb950">Sum</div>';
-  // Overflow bit
+  // Overflow / carry-out bit
   if (finalCarry && revealCol >= bits) {
-    html += `<div class="step-cell" style="color:#3fb950">1</div>`;
+    html += `<div class="step-cell" style="color:#da3633;background:#da363320;border-radius:4px;border:1px dashed #da3633;font-size:.9em" title="Overflow carry-out">1</div>`;
   } else {
     html += `<div class="step-cell"></div>`;
   }
@@ -567,8 +729,10 @@ function showAddSteps(aBin, bBin, carries, results, finalCarry, bits, revealCol)
 document.getElementById('add-go').onclick = () => addCompute(false);
 document.getElementById('add-step').onclick = () => addCompute(true);
 document.getElementById('add-random').onclick = () => {
-  document.getElementById('add-a').value = Math.floor(Math.random() * 128);
-  document.getElementById('add-b').value = Math.floor(Math.random() * 128);
+  const maxV = Math.min(getMaxVal(), 65535);
+  const half = Math.floor(maxV / 2);
+  document.getElementById('add-a').value = Math.floor(Math.random() * (half + 1));
+  document.getElementById('add-b').value = Math.floor(Math.random() * (half + 1));
   addCompute(false);
 };
 
@@ -579,12 +743,29 @@ let subStepTimer = null;
 
 function subCompute(stepping) {
   if (subStepTimer) { clearInterval(subStepTimer); subStepTimer = null; }
-  let a = Math.max(0, Math.min(255, Math.floor(+document.getElementById('sub-a').value) || 0));
-  let b = Math.max(0, Math.min(255, Math.floor(+document.getElementById('sub-b').value) || 0));
+  const maxV = getMaxVal();
+  let a = Math.max(0, Math.min(maxV, Math.floor(+document.getElementById('sub-a').value) || 0));
+  let b = Math.max(0, Math.min(maxV, Math.floor(+document.getElementById('sub-b').value) || 0));
   document.getElementById('sub-a').value = a;
   document.getElementById('sub-b').value = b;
 
   const method = document.getElementById('sub-method').value;
+
+  // Unsigned underflow detection
+  const ovDiv = document.getElementById('sub-overflow');
+  if (a < b) {
+    const bits = getBitLen(Math.max(1, Math.ceil(Math.log2(Math.max(a, b, 1) + 1))));
+    const maxResult = (bits >= 32) ? 4294967295 : (1 << bits) - 1;
+    const wrapped = (a - b + maxResult + 1) & maxResult;
+    ovDiv.innerHTML = `<div class="overflow-warn">` +
+      `<div class="ow-title">⚠ Unsigned underflow — A &lt; B</div>` +
+      `<div class="ow-detail">` +
+      `True result: <code>${a} − ${b} = ${a - b}</code> (negative — cannot be represented as unsigned)<br>` +
+      `If interpreted as ${bits}-bit unsigned wrap-around: <code>${wrapped}</code> (<code>${toBin(wrapped, bits)}</code>)` +
+      `</div></div>`;
+  } else {
+    ovDiv.innerHTML = '';
+  }
 
   if (method === 'borrow') {
     subBorrow(a, b, stepping);
@@ -603,7 +784,8 @@ function subBorrow(a, b, stepping) {
   const bigVal = negative ? b : a;
   const smallVal = negative ? a : b;
 
-  const bits = 8;
+  const minBits = Math.max(1, Math.ceil(Math.log2(Math.max(bigVal, 1) + 1)));
+  const bits = getBitLen(minBits);
   const bigBin = toBin(bigVal, bits);
   const smallBin = toBin(smallVal, bits);
   const diffBin = toBin(absDiff, bits);
@@ -723,7 +905,9 @@ function showSubBorrowSteps(topBin, botBin, borrows, results, bits, revealCol, n
 }
 
 function subOnes(a, b, stepping) {
-  const bits = 9; // 8 data bits + sign
+  const maxVal = Math.max(a, b);
+  const minBits = Math.max(1, Math.ceil(Math.log2((maxVal || 1) + 1)));
+  const bits = getBitLen(minBits) + 1; // +1 for sign bit
   const aBin = toBin(a, bits);
   const bBin = toBin(b, bits);
   const result = a - b;
@@ -873,14 +1057,17 @@ function subOnes(a, b, stepping) {
 }
 
 function subTwos(a, b, stepping) {
-  const bits = 9; // 8 data bits + sign
+  const maxVal = Math.max(a, b);
+  const minBits = Math.max(1, Math.ceil(Math.log2((maxVal || 1) + 1)));
+  const bits = getBitLen(minBits) + 1; // +1 for sign bit
   const aBin = toBin(a, bits);
   const bBin = toBin(b, bits);
   // Two's complement of B: invert all bits, add 1
   const bInv = bBin.split('').map(c => c === '0' ? '1' : '0').join('');
-  const bTwos = toBin((~b & ((1 << bits) - 1)) + 1, bits); // proper two's complement
+  const bInvVal = parseInt(bInv, 2);
+  const bTwos = toBin(bInvVal + 1, bits); // proper two's complement
   // Add A + two's complement of B
-  const rawSum = a + ((~b & ((1 << bits) - 1)) + 1);
+  const rawSum = a + bInvVal + 1;
   const sumBits = toBin(rawSum, bits + 1);
   const result = a - b;
 
@@ -955,8 +1142,9 @@ function subTwos(a, b, stepping) {
 document.getElementById('sub-go').onclick = () => subCompute(false);
 document.getElementById('sub-step').onclick = () => subCompute(true);
 document.getElementById('sub-random').onclick = () => {
-  const a = Math.floor(Math.random() * 200);
-  const b = Math.floor(Math.random() * 200);
+  const maxV = Math.min(getMaxVal(), 65535);
+  const a = Math.floor(Math.random() * (maxV + 1));
+  const b = Math.floor(Math.random() * (maxV + 1));
   document.getElementById('sub-a').value = Math.max(a, b);
   document.getElementById('sub-b').value = Math.min(a, b);
   subCompute(false);
