@@ -208,7 +208,19 @@ function updateResults() {
   document.getElementById('resGrid').innerHTML = html;
 
   // Formulas
-  let f = '<span class="h">Impedance:</span> ';
+  let f = '<span class="h">Reactance:</span> ';
+  const Lmh = res.L * 1000, Cuf = res.C * 1e6;
+  f += '<span class="f">X<sub>L</sub> = ωL = 2π·f·L = 2π × ' + res.f + ' × ' + Lmh + ' mH = 2π × ' + res.f + ' × ' + (res.L < 0.01 ? res.L.toFixed(4) : res.L.toFixed(3)) + ' = ' + fmt(res.XL) + ' Ω</span><br>';
+  if (Cuf > 0) {
+    if (res.f > 0) {
+      f += '<span class="f">X<sub>C</sub> = 1/(ωC) = 1/(2π·f·C) = 1/(2π × ' + res.f + ' × ' + Cuf + ' μF) = 1/(2π × ' + res.f + ' × ' + (res.C < 0.0001 ? res.C.toExponential(2) : res.C.toFixed(6)) + ') = ' + fmt(res.XC) + ' Ω</span><br>';
+    } else {
+      f += '<span class="f">X<sub>C</sub> = 1/(ωC) = 1/(2π × 0 × ' + Cuf + ' μF) = ∞ (DC)</span><br>';
+    }
+  } else {
+    f += '<span class="f">X<sub>C</sub> = 1/(ωC) = 0 Ω &nbsp;(no capacitor)</span><br>';
+  }
+  f += '<br><span class="h">Impedance:</span> ';
   const xcStr = isFinite(res.XC) ? fmt(res.XC) : '∞';
   const xStr = isFinite(res.X) ? fmt(res.X) : (res.X === -Infinity ? '−∞' : '∞');
   f += '<span class="f">Z = R + j(X<sub>L</sub>−X<sub>C</sub>) = ' + fmt(res.R) + ' + j(' + fmt(res.XL) + '−' + xcStr + ') = ' + fmt(res.R) + (isFinite(res.X) ? (res.X >= 0 ? '+' : '') + 'j' + fmt(res.X) : '+j(−∞)') + ' Ω</span>';
