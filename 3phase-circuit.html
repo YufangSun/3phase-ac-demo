@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-Phase AC Circuit Configurations</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:18px}
+  h1{font-size:1.5em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.92em;text-align:center;max-width:820px}
+
+  .tabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+  .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.88em;
+    background:#161b22;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .tab:hover{border-color:#58a6ff;color:#e6edf3}
+  .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+
+  .main{max-width:960px;width:100%;margin-top:8px}
+  .row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .panel{background:#161b22;border-radius:12px;padding:16px;border:1px solid #30363d;margin-bottom:12px;flex:1;min-width:300px}
+  .panel h2{font-size:.9em;color:#8b949e;margin-bottom:8px;text-align:center}
+  canvas{display:block;margin:0 auto;border-radius:8px}
+
+  .controls{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center;
+    background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 16px;
+    margin-bottom:10px;max-width:960px;width:100%}
+  .cg{display:flex;align-items:center;gap:6px}
+  .cg label{font-size:.82em;color:#8b949e;white-space:nowrap}
+  input[type="range"]{width:100px;accent-color:#58a6ff}
+  .cv{font-size:.82em;color:#58a6ff;min-width:55px;font-family:'Courier New',monospace}
+
+  .results{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px 18px;
+    margin-bottom:12px;max-width:960px;width:100%}
+  .results h2{font-size:.9em;color:#8b949e;margin-bottom:8px;text-align:center}
+  .res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .res-item{background:#0d1117;border-radius:8px;padding:8px 12px;text-align:center}
+  .res-label{font-size:.72em;color:#7d8590;margin-bottom:2px}
+  .res-val{font-size:1.05em;font-family:'Courier New',monospace;font-weight:bold}
+
+  .formula-box{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 14px;
+    margin-top:8px;font-size:.82em;color:#8b949e;line-height:1.7;text-align:center}
+  .formula-box .f{color:#f78166;font-family:'Courier New',monospace}
+  .formula-box .h{color:#e0e0ff;font-weight:bold}
+
+  .info{max-width:960px;width:100%;background:#161b22;border-radius:12px;
+    padding:14px 18px;border:1px solid #30363d;margin-top:10px;font-size:.84em;line-height:1.6;color:#8b949e}
+  .info strong{color:#e0e0ff}
+  a{color:#58a6ff}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<h1>3-Phase AC Circuit Configurations</h1>
+<p class="subtitle">Compare Y-Y, Y-Δ, Δ-Δ, and Δ-Y connections — voltage/current relationships, phasor diagrams, and power</p>
+
+<div class="tabs">
+  <div class="tab active" data-cfg="yy">Y – Y</div>
+  <div class="tab" data-cfg="yd">Y – Δ</div>
+  <div class="tab" data-cfg="dd">Δ – Δ</div>
+  <div class="tab" data-cfg="dy">Δ – Y</div>
+</div>
+
+<div class="controls">
+  <div class="cg">
+    <label>V<sub>source</sub>:</label>
+    <input type="range" id="sVmag" min="10" max="480" step="5" value="120">
+    <span class="cv" id="sVmagV">120 V</span>
+  </div>
+  <div class="cg">
+    <label>|Z<sub>load</sub>|:</label>
+    <input type="range" id="sZmag" min="1" max="100" step="1" value="30">
+    <span class="cv" id="sZmagV">30 Ω</span>
+  </div>
+  <div class="cg">
+    <label>θ<sub>load</sub>:</label>
+    <input type="range" id="sZang" min="-80" max="80" step="1" value="30">
+    <span class="cv" id="sZangV">30°</span>
+  </div>
+  <div class="cg">
+    <label>Freq:</label>
+    <input type="range" id="sFreq" min="0.3" max="3" step="0.1" value="1">
+    <span class="cv" id="sFreqV">1.0 Hz</span>
+  </div>
+</div>
+
+<div class="results" id="resBox">
+  <h2 id="resTitle">Y – Y Results</h2>
+  <div class="res-grid" id="resGrid"></div>
+  <div class="formula-box" id="formulaBox"></div>
+</div>
+
+<div class="main">
+  <div class="row">
+    <div class="panel">
+      <h2>Circuit Diagram</h2>
+      <canvas id="circuitCanvas" width="440" height="320"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Phasor Diagram</h2>
+      <canvas id="phasorCanvas" width="340" height="320"></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class="panel">
+      <h2>Waveforms</h2>
+      <canvas id="waveCanvas" width="920" height="240"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Y (Star) connection:</strong> V<sub>line</sub> = √3 · V<sub>phase</sub>, I<sub>line</sub> = I<sub>phase</sub>.
+  Neutral wire carries zero current in balanced system.<br>
+  <strong>Δ (Delta) connection:</strong> V<sub>line</sub> = V<sub>phase</sub>, I<sub>line</sub> = √3 · I<sub>phase</sub>.
+  No neutral wire needed.<br>
+  <strong>Power:</strong> P = √3 · V<sub>L</sub> · I<sub>L</sub> · cos θ &nbsp;(same formula for all configs)<br><br>
+  <a href="index.html">← All Demos</a> ·
+  <a href="3phase-ac.html">3-Phase AC Power</a> ·
+  <a href="phasor-transform.html">Phasor Transform</a> ·
+  <a href="transformer.html">Transformer</a> ·
+  <a href="mutual-inductance.html">Mutual Inductance</a>
+</div>
+
+<script>
+// ── Config ──
+let cfg = 'yy'; // 'yy','yd','dd','dy'
+const sqrt3 = Math.sqrt(3);
+
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  cfg = t.dataset.cfg;
+  compute();
+}));
+
+// ── Sliders ──
+const sVmag = document.getElementById('sVmag');
+const sZmag = document.getElementById('sZmag');
+const sZang = document.getElementById('sZang');
+const sFreq = document.getElementById('sFreq');
+
+sVmag.oninput = () => { document.getElementById('sVmagV').textContent = sVmag.value + ' V'; compute(); };
+sZmag.oninput = () => { document.getElementById('sZmagV').textContent = sZmag.value + ' Ω'; compute(); };
+sZang.oninput = () => { document.getElementById('sZangV').textContent = sZang.value + '°'; compute(); };
+sFreq.oninput = () => { document.getElementById('sFreqV').textContent = (+sFreq.value).toFixed(1) + ' Hz'; };
+
+// ── Canvases ──
+const circuitC = document.getElementById('circuitCanvas');
+const phasorC = document.getElementById('phasorCanvas');
+const waveC = document.getElementById('waveCanvas');
+const cCtx = circuitC.getContext('2d');
+const pCtx = phasorC.getContext('2d');
+const wCtx = waveC.getContext('2d');
+
+const COLORS = {a:'#ff4466', b:'#44cc66', c:'#4488ff'};
+const COLORSARR = ['#ff4466','#44cc66','#4488ff'];
+const PHASE_OFF = [0, -2*Math.PI/3, -4*Math.PI/3];
+const LABELS = ['A','B','C'];
+
+// ── Computed values ──
+let res = {};
+
+function compute() {
+  const Vs = +sVmag.value;   // source voltage (phase for Y, line for Δ)
+  const Zm = +sZmag.value;
+  const Za = +sZang.value * Math.PI / 180;
+  const srcType = cfg[0]; // 'y' or 'd'
+  const loadType = cfg[1]; // 'y' or 'd'
+
+  // Source voltages
+  let VpS, VlS; // phase and line voltages of source
+  if (srcType === 'y') {
+    VpS = Vs;
+    VlS = Vs * sqrt3;
+  } else {
+    VlS = Vs;
+    VpS = Vs; // Δ source: Vphase = Vline
+  }
+
+  // Load voltages
+  let VpL, VlL; // phase and line voltages at load
+  VlL = VlS; // line voltage same across (ideal, no line impedance)
+  if (loadType === 'y') {
+    VpL = VlL / sqrt3;
+  } else {
+    VpL = VlL;
+  }
+
+  // Load phase current
+  const IpL = VpL / Zm;
+
+  // Load line current
+  let IlL;
+  if (loadType === 'y') {
+    IlL = IpL;
+  } else {
+    IlL = IpL * sqrt3;
+  }
+
+  // Source phase current
+  let IpS;
+  if (srcType === 'y') {
+    IpS = IlL; // Y source: Iphase = Iline
+  } else {
+    IpS = IlL / sqrt3; // Δ source: Iphase = Iline/√3
+  }
+
+  // Power
+  const PF = Math.cos(Za);
+  const P = sqrt3 * VlL * IlL * PF;
+  const Q = sqrt3 * VlL * IlL * Math.sin(Za);
+  const S = sqrt3 * VlL * IlL;
+
+  res = {
+    srcType, loadType,
+    VpS, VlS, VpL, VlL, IpL, IlL, IpS,
+    Zm, Za, PF, P, Q, S, Vs
+  };
+
+  updateResults();
+  drawCircuit();
+  drawPhasors();
+}
+
+function fmtV(v) { return v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.round(v); }
+
+function updateResults() {
+  const names = {yy:'Y – Y', yd:'Y – Δ', dd:'Δ – Δ', dy:'Δ – Y'};
+  document.getElementById('resTitle').textContent = names[cfg] + ' Results';
+
+  const r = res;
+  const items = [
+    {label:'V<sub>L,source</sub> (line)', val: fmtV(r.VlS) + ' V', color:'#58a6ff'},
+    {label:'V<sub>φ,source</sub> (phase)', val: fmtV(r.VpS) + ' V', color:'#58a6ff'},
+    {label:'V<sub>L,load</sub> (line)', val: fmtV(r.VlL) + ' V', color:'#3fb950'},
+    {label:'V<sub>φ,load</sub> (phase)', val: fmtV(r.VpL) + ' V', color:'#3fb950'},
+    {label:'I<sub>line</sub>', val: fmtV(r.IlL) + ' A', color:'#f78166'},
+    {label:'I<sub>φ,load</sub> (phase)', val: fmtV(r.IpL) + ' A', color:'#f78166'},
+    {label:'I<sub>φ,source</sub> (phase)', val: fmtV(r.IpS) + ' A', color:'#f78166'},
+    {label:'PF (cos θ)', val: r.PF.toFixed(3), color:'#d2a8ff'},
+    {label:'P (active)', val: fmtV(r.P) + ' W', color:'#d29922'},
+    {label:'Q (reactive)', val: fmtV(r.Q) + ' VAR', color:'#d29922'},
+    {label:'S (apparent)', val: fmtV(r.S) + ' VA', color:'#d29922'},
+  ];
+
+  let html = '';
+  items.forEach(it => {
+    html += `<div class="res-item"><div class="res-label">${it.label}</div>` +
+      `<div class="res-val" style="color:${it.color}">${it.val}</div></div>`;
+  });
+  document.getElementById('resGrid').innerHTML = html;
+
+  // Formulas
+  const s = res.srcType === 'y' ? 'Y' : 'Δ';
+  const l = res.loadType === 'y' ? 'Y' : 'Δ';
+  let f = `<span class="h">Source (${s}):</span> `;
+  if (res.srcType === 'y') {
+    f += `<span class="f">V<sub>L</sub> = √3 · V<sub>φ</sub> = √3 × ${fmtV(res.VpS)} = ${fmtV(res.VlS)} V</span>, `;
+    f += `<span class="f">I<sub>φ</sub> = I<sub>line</sub> = ${fmtV(res.IpS)} A</span>`;
+  } else {
+    f += `<span class="f">V<sub>L</sub> = V<sub>φ</sub> = ${fmtV(res.VlS)} V</span>, `;
+    f += `<span class="f">I<sub>line</sub> = √3 · I<sub>φ</sub> → I<sub>φ</sub> = ${fmtV(res.IlL)}/√3 = ${fmtV(res.IpS)} A</span>`;
+  }
+  f += `<br><span class="h">Load (${l}):</span> `;
+  if (res.loadType === 'y') {
+    f += `<span class="f">V<sub>φ</sub> = V<sub>L</sub>/√3 = ${fmtV(res.VlL)}/√3 = ${fmtV(res.VpL)} V</span>, `;
+    f += `<span class="f">I<sub>φ</sub> = V<sub>φ</sub>/|Z| = ${fmtV(res.VpL)}/${res.Zm} = ${fmtV(res.IpL)} A</span>, `;
+    f += `<span class="f">I<sub>line</sub> = I<sub>φ</sub> = ${fmtV(res.IlL)} A</span>`;
+  } else {
+    f += `<span class="f">V<sub>φ</sub> = V<sub>L</sub> = ${fmtV(res.VpL)} V</span>, `;
+    f += `<span class="f">I<sub>φ</sub> = V<sub>φ</sub>/|Z| = ${fmtV(res.VpL)}/${res.Zm} = ${fmtV(res.IpL)} A</span>, `;
+    f += `<span class="f">I<sub>line</sub> = √3 · I<sub>φ</sub> = ${fmtV(res.IlL)} A</span>`;
+  }
+  f += `<br><span class="h">Power:</span> <span class="f">P = √3 · ${fmtV(res.VlL)} · ${fmtV(res.IlL)} · cos(${(res.Za*180/Math.PI).toFixed(0)}°) = ${fmtV(res.P)} W</span>`;
+  document.getElementById('formulaBox').innerHTML = f;
+}
+
+// ── Circuit Diagram ──
+function drawCircuit() {
+  const W = circuitC.width, H = circuitC.height;
+  const ctx = cCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  const srcY = res.srcType === 'y';
+  const ldY = res.loadType === 'y';
+
+  // Layout
+  const sx = 100; // source center x
+  const lx = 340; // load center x
+  const cy = 160; // center y
+  const sp = 60;  // vertical spacing between phases
+
+  // Phase colors
+  const pc = [COLORS.a, COLORS.b, COLORS.c];
+
+  // Draw source
+  drawSourceBlock(ctx, sx, cy, sp, srcY, pc);
+  // Draw load
+  drawLoadBlock(ctx, lx, cy, sp, ldY, pc);
+  // Draw connecting lines
+  drawLines(ctx, sx, lx, cy, sp, pc);
+
+  // Labels
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e6edf3';
+  ctx.fillText(srcY ? 'Y Source' : 'Δ Source', sx, 28);
+  ctx.fillText(ldY ? 'Y Load' : 'Δ Load', lx, 28);
+
+  // Line labels
+  ctx.font = '11px sans-serif';
+  const mid = (sx + 60 + lx - 60) / 2;
+  for (let i = 0; i < 3; i++) {
+    const y = cy - sp + i * sp;
+    ctx.fillStyle = pc[i];
+    ctx.fillText(LABELS[i], mid, y - 6);
+  }
+}
+
+function drawSourceBlock(ctx, cx, cy, sp, isY, pc) {
+  if (isY) {
+    // Y: three branches meeting at center (neutral)
+    ctx.strokeStyle = '#30363d';
+    ctx.lineWidth = 1;
+    // Neutral point
+    const nx = cx - 20;
+    for (let i = 0; i < 3; i++) {
+      const y = cy - sp + i * sp;
+      const ex = cx + 50;
+      ctx.strokeStyle = pc[i];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(nx, cy);
+      ctx.lineTo(nx + 10, y);
+      ctx.lineTo(ex, y);
+      ctx.stroke();
+      // AC source symbol
+      drawACSource(ctx, nx + 10, y, cx + 20, y, pc[i]);
+    }
+    // Neutral dot
+    ctx.beginPath();
+    ctx.arc(nx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#8b949e';
+    ctx.fill();
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#8b949e';
+    ctx.textAlign = 'right';
+    ctx.fillText('N', nx - 8, cy + 4);
+  } else {
+    // Δ: triangle
+    const pts = [];
+    for (let i = 0; i < 3; i++) pts.push({x: cx + 50, y: cy - sp + i * sp});
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      ctx.strokeStyle = pc[i];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, pts[i].y);
+      ctx.lineTo(cx - 10, pts[j].y);
+      ctx.stroke();
+      // Line to right
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, pts[i].y);
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      // AC source on delta side
+      drawACSource(ctx, cx - 10, (pts[i].y + pts[j].y) / 2 - 5, cx - 10, (pts[i].y + pts[j].y) / 2 + 5, pc[i]);
+    }
+  }
+}
+
+function drawLoadBlock(ctx, cx, cy, sp, isY, pc) {
+  if (isY) {
+    const nx = cx + 20;
+    for (let i = 0; i < 3; i++) {
+      const y = cy - sp + i * sp;
+      const sx = cx - 50;
+      ctx.strokeStyle = pc[i];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx, y);
+      ctx.lineTo(nx - 10, y);
+      ctx.lineTo(nx, cy);
+      ctx.stroke();
+      // Impedance box
+      drawZBox(ctx, cx - 25, y, pc[i]);
+    }
+    // Neutral dot
+    ctx.beginPath();
+    ctx.arc(nx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#8b949e';
+    ctx.fill();
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#8b949e';
+    ctx.textAlign = 'left';
+    ctx.fillText('N', nx + 8, cy + 4);
+  } else {
+    const pts = [];
+    for (let i = 0; i < 3; i++) pts.push({x: cx - 50, y: cy - sp + i * sp});
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      ctx.strokeStyle = pc[i];
+      ctx.lineWidth = 2;
+      // Line from left
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x, pts[i].y);
+      ctx.lineTo(cx + 10, pts[i].y);
+      ctx.stroke();
+      // Delta side
+      ctx.strokeStyle = pc[i];
+      ctx.beginPath();
+      ctx.moveTo(cx + 10, pts[i].y);
+      ctx.lineTo(cx + 10, pts[j].y);
+      ctx.stroke();
+      // Impedance box on delta side
+      const my = (pts[i].y + pts[j].y) / 2;
+      drawZBox(ctx, cx + 10, my, pc[i]);
+    }
+  }
+}
+
+function drawACSource(ctx, x1, y1, x2, y2, color) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  ctx.beginPath();
+  ctx.arc(mx, my, 7, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Sine wave inside
+  ctx.beginPath();
+  ctx.moveTo(mx - 5, my);
+  ctx.quadraticCurveTo(mx - 2, my - 4, mx, my);
+  ctx.quadraticCurveTo(mx + 2, my + 4, mx + 5, my);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawZBox(ctx, x, y, color) {
+  ctx.fillStyle = color + '20';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.rect(x - 12, y - 8, 24, 16);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Z', x, y);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawLines(ctx, sx, lx, cy, sp, pc) {
+  const x1 = sx + 55;
+  const x2 = lx - 55;
+  for (let i = 0; i < 3; i++) {
+    const y = cy - sp + i * sp;
+    ctx.strokeStyle = pc[i];
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+    // Arrow
+    ctx.fillStyle = pc[i];
+    ctx.beginPath();
+    const ax = (x1 + x2) / 2 + 10;
+    ctx.moveTo(ax, y);
+    ctx.lineTo(ax - 8, y - 4);
+    ctx.lineTo(ax - 8, y + 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Current label
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#f78166';
+  ctx.textAlign = 'center';
+  ctx.fillText('I_L', (x1 + x2) / 2, cy + sp + 22);
+}
+
+// ── Phasor Diagram ──
+function drawPhasors() {
+  const W = phasorC.width, H = phasorC.height;
+  const ctx = pCtx;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const maxR = Math.min(W, H) / 2 - 35;
+
+  // Grid circles
+  ctx.strokeStyle = '#ffffff08';
+  ctx.lineWidth = 1;
+  for (let r = maxR / 3; r <= maxR; r += maxR / 3) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = '#ffffff15';
+  ctx.beginPath(); ctx.moveTo(10, cy); ctx.lineTo(W - 10, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, 10); ctx.lineTo(cx, H - 10); ctx.stroke();
+
+  const r = res;
+  const baseAngle = time * (+sFreq.value) * 2 * Math.PI;
+
+  // Normalize to fit: pick max of VlL or VpL for voltage scale
+  const maxV = Math.max(r.VlS, r.VlL, r.VpS, r.VpL);
+  const maxI = Math.max(r.IlL, r.IpL);
+  const vScale = maxR * 0.7 / (maxV || 1);
+  const iScale = maxR * 0.5 / (maxI || 1);
+
+  // Draw voltage phasors (line voltages)
+  for (let i = 0; i < 3; i++) {
+    const ang = baseAngle + PHASE_OFF[i];
+    const mag = r.VpL * vScale;
+    drawArrow(ctx, cx, cy, ang, mag, COLORSARR[i], 2.5);
+    // Label
+    const lx2 = cx + Math.cos(ang) * (mag + 14);
+    const ly2 = cy - Math.sin(ang) * (mag + 14);
+    ctx.fillStyle = COLORSARR[i];
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('V' + LABELS[i], lx2, ly2 + 4);
+  }
+
+  // Draw current phasors (lagging by Za)
+  for (let i = 0; i < 3; i++) {
+    const ang = baseAngle + PHASE_OFF[i] - r.Za;
+    const mag = r.IpL * iScale;
+    drawArrow(ctx, cx, cy, ang, mag, COLORSARR[i], 1.5, true);
+    // Label
+    const lx2 = cx + Math.cos(ang) * (mag + 14);
+    const ly2 = cy - Math.sin(ang) * (mag + 14);
+    ctx.fillStyle = COLORSARR[i];
+    ctx.font = '10px sans-serif';
+    ctx.fillText('I' + LABELS[i], lx2, ly2 + 4);
+  }
+
+  // Legend
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('— Voltage (Vφ)', 8, H - 22);
+  ctx.fillText('--- Current (Iφ)', 8, H - 8);
+  // Angle arc showing θ
+  if (Math.abs(r.Za) > 0.01) {
+    const arcR = 30;
+    const a1 = baseAngle + PHASE_OFF[0];
+    const a2 = a1 - r.Za;
+    ctx.strokeStyle = '#d2a8ff60';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, arcR, -a1, -a2, r.Za > 0);
+    ctx.stroke();
+    const am = (a1 + a2) / 2;
+    ctx.fillStyle = '#d2a8ff';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('θ', cx + Math.cos(am) * (arcR + 10), cy - Math.sin(am) * (arcR + 10) + 3);
+  }
+}
+
+function drawArrow(ctx, cx, cy, angle, length, color, width, dashed) {
+  const ex = cx + Math.cos(angle) * length;
+  const ey = cy - Math.sin(angle) * length;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if (dashed) ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Arrowhead
+  const hl = 8;
+  const ha = Math.atan2(cy - ey, ex - cx);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - hl * Math.cos(ha - 0.35), ey + hl * Math.sin(ha - 0.35));
+  ctx.lineTo(ex - hl * Math.cos(ha + 0.35), ey + hl * Math.sin(ha + 0.35));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ── Waveforms ──
+function drawWaveforms() {
+  const W = waveC.width, H = waveC.height;
+  const ctx = wCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  const freq = +sFreq.value;
+  const r = res;
+  const midY = H / 2;
+  const plotL = 60, plotR = W - 10;
+  const plotW = plotR - plotL;
+
+  // Grid
+  ctx.strokeStyle = '#ffffff08';
+  ctx.lineWidth = 1;
+  for (let y = 20; y < H - 10; y += (H - 30) / 6) {
+    ctx.beginPath(); ctx.moveTo(plotL, y); ctx.lineTo(plotR, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#ffffff20';
+  ctx.beginPath(); ctx.moveTo(plotL, midY); ctx.lineTo(plotR, midY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(plotL, 20); ctx.lineTo(plotL, H - 10); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#484f58';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('+V', plotL - 4, 26);
+  ctx.fillText('0', plotL - 4, midY + 3);
+  ctx.fillText('−V', plotL - 4, H - 12);
+  ctx.textAlign = 'center';
+  ctx.fillText('Time →', (plotL + plotR) / 2, H - 1);
+
+  const yScale = (H / 2 - 25);
+  const maxV = r.VpL || 1;
+  const cycles = 2;
+
+  // Draw voltage waveforms
+  for (let p = 0; p < 3; p++) {
+    ctx.strokeStyle = COLORSARR[p];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles;
+      const v = Math.sin(2 * Math.PI * freq * t + PHASE_OFF[p] + time * freq * 2 * Math.PI);
+      const x = plotL + i;
+      const y = midY - v * yScale * 0.8;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Draw current waveforms (dashed, smaller)
+  for (let p = 0; p < 3; p++) {
+    ctx.strokeStyle = COLORSARR[p];
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles;
+      const v = Math.sin(2 * Math.PI * freq * t + PHASE_OFF[p] - r.Za + time * freq * 2 * Math.PI);
+      const x = plotL + i;
+      const y = midY - v * yScale * 0.5;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Legend
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'left';
+  for (let p = 0; p < 3; p++) {
+    ctx.fillStyle = COLORSARR[p];
+    ctx.fillText('V' + LABELS[p], plotR + 2 - 90 * (3 - p), 14);
+  }
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('— Voltage   --- Current', plotL + 4, 14);
+}
+
+// ── Animation ──
+let time = 0;
+let lastTS = 0;
+
+function animate(ts) {
+  if (!lastTS) lastTS = ts;
+  const dt = (ts - lastTS) / 1000;
+  lastTS = ts;
+  time += dt * (+sFreq.value);
+  drawPhasors();
+  drawWaveforms();
+  requestAnimationFrame(animate);
+}
+
+compute();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
