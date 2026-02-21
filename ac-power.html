@@ -214,6 +214,12 @@ function updateResults() {
   f += '<span class="f">Z = R + j(X<sub>L</sub>−X<sub>C</sub>) = ' + fmt(res.R) + ' + j(' + fmt(res.XL) + '−' + xcStr + ') = ' + fmt(res.R) + (isFinite(res.X) ? (res.X >= 0 ? '+' : '') + 'j' + fmt(res.X) : '+j(−∞)') + ' Ω</span>';
   if (res.f === 0) f += ' <span style="color:#d29922">(DC — capacitor blocks current)</span>';
   f += '<br>';
+  f += '<span class="h">Angle:</span> ';
+  const xVal = isFinite(res.X) ? fmt(res.X) : (res.X === -Infinity ? '−∞' : '∞');
+  f += '<span class="f">θ = arctan(X / R) = arctan(' + xVal + ' / ' + fmt(res.R) + ') = ' + (res.theta * 180 / PI).toFixed(1) + '°</span>';
+  f += ' &nbsp;→&nbsp; <span class="f">PF = cos(' + (res.theta * 180 / PI).toFixed(1) + '°) = ' + res.PF.toFixed(3) + '</span>';
+  if (res.loadType !== 'Resistive' && res.f > 0) f += ' <span style="color:#d2a8ff">(' + (res.X > 0 ? 'lagging' : 'leading') + ')</span>';
+  f += '<br>';
   f += '<span class="h">Power:</span> ';
   f += '<span class="f">P = V·I·cos θ = ' + fmt(res.Vrms) + '×' + fmt(res.Irms) + '×cos(' + (res.theta*180/PI).toFixed(1) + '°) = ' + fmt(res.P) + ' W</span><br>';
   f += '<span class="f">Q = V·I·sin θ = ' + fmt(res.Vrms) + '×' + fmt(res.Irms) + '×sin(' + (res.theta*180/PI).toFixed(1) + '°) = ' + fmt(res.Q) + ' VAR</span><br>';
