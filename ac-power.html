@@ -58,7 +58,7 @@
   </div>
   <div class="cg">
     <label>Freq:</label>
-    <input type="range" id="sF" min="10" max="500" step="5" value="60">
+    <input type="range" id="sF" min="0" max="500" step="1" value="60">
     <span class="cv" id="sFV">60 Hz</span>
   </div>
   <div class="cg">
@@ -158,12 +158,12 @@ function compute() {
   const w = 2 * PI * f;
 
   const XL = w * L;
-  const XC = C > 0 ? 1 / (w * C) : 0;
+  const XC = (C > 0 && w > 0) ? 1 / (w * C) : (C > 0 ? Infinity : 0);
   const X = XL - XC;
   const Zmag = Math.sqrt(R * R + X * X);
   const theta = Math.atan2(X, R);
 
-  const Irms = Vrms / Zmag;
+  const Irms = isFinite(Zmag) && Zmag > 0 ? Vrms / Zmag : (f === 0 && C > 0 ? 0 : Vrms / R);
   const Vm = Vrms * sqrt2;
   const Im = Irms * sqrt2;
 
@@ -172,7 +172,11 @@ function compute() {
   const S = Vrms * Irms;                     // apparent power
   const PF = Math.cos(theta);                // power factor
 
-  const loadType = Math.abs(X) < 0.01 ? 'Resistive' : X > 0 ? 'Inductive (lagging)' : 'Capacitive (leading)';
+  let loadType;
+  if (f === 0) loadType = C > 0 ? 'DC (cap blocks)' : 'DC (resistive)';
+  else if (!isFinite(X)) loadType = 'Capacitive (∞ at DC)';
+  else if (Math.abs(X) < 0.01) loadType = 'Resistive';
+  else loadType = X > 0 ? 'Inductive (lagging)' : 'Capacitive (leading)';
 
   res = { Vrms, Irms, Vm, Im, f, w, R, XL, XC, X, Zmag, theta, P, Q, S, PF, L, C, loadType };
 
@@ -193,8 +197,8 @@ function updateResults() {
     {label: '|Z|', val: fmt(r.Zmag) + ' Ω', color: '#8b949e'},
     {label: 'I_rms', val: fmt(r.Irms) + ' A', color: '#f97583'},
     {label: 'X_L', val: fmt(r.XL) + ' Ω', color: '#f78166'},
-    {label: 'X_C', val: fmt(r.XC) + ' Ω', color: '#79c0ff'},
-    {label: 'X (net reactive)', val: fmt(r.X) + ' Ω', color: '#f78166'},
+    {label: 'X_C', val: isFinite(r.XC) ? fmt(r.XC) + ' Ω' : '∞ (DC)', color: '#79c0ff'},
+    {label: 'X (net reactive)', val: isFinite(r.X) ? fmt(r.X) + ' Ω' : (r.X === -Infinity ? '−∞' : '∞'), color: '#f78166'},
   ];
   let html = '';
   items.forEach(it => {
@@ -205,7 +209,11 @@ function updateResults() {
 
   // Formulas
   let f = '<span class="h">Impedance:</span> ';
-  f += '<span class="f">Z = R + j(X<sub>L</sub>−X<sub>C</sub>) = ' + fmt(res.R) + ' + j(' + fmt(res.XL) + '−' + fmt(res.XC) + ') = ' + fmt(res.R) + (res.X >= 0 ? '+' : '') + 'j' + fmt(res.X) + ' Ω</span><br>';
+  const xcStr = isFinite(res.XC) ? fmt(res.XC) : '∞';
+  const xStr = isFinite(res.X) ? fmt(res.X) : (res.X === -Infinity ? '−∞' : '∞');
+  f += '<span class="f">Z = R + j(X<sub>L</sub>−X<sub>C</sub>) = ' + fmt(res.R) + ' + j(' + fmt(res.XL) + '−' + xcStr + ') = ' + fmt(res.R) + (isFinite(res.X) ? (res.X >= 0 ? '+' : '') + 'j' + fmt(res.X) : '+j(−∞)') + ' Ω</span>';
+  if (res.f === 0) f += ' <span style="color:#d29922">(DC — capacitor blocks current)</span>';
+  f += '<br>';
   f += '<span class="h">Power:</span> ';
   f += '<span class="f">P = V·I·cos θ = ' + fmt(res.Vrms) + '×' + fmt(res.Irms) + '×cos(' + (res.theta*180/PI).toFixed(1) + '°) = ' + fmt(res.P) + ' W</span><br>';
   f += '<span class="f">Q = V·I·sin θ = ' + fmt(res.Vrms) + '×' + fmt(res.Irms) + '×sin(' + (res.theta*180/PI).toFixed(1) + '°) = ' + fmt(res.Q) + ' VAR</span><br>';
