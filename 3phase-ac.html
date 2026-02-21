@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-Phase AC Power Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 { margin-bottom: 4px; font-size: 1.6em; color: #e0e0ff; }
+  .subtitle { color: #888; margin-bottom: 16px; font-size: 0.95em; }
+  .container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    max-width: 1200px;
+    width: 100%;
+  }
+  .panel {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #0f3460;
+  }
+  .panel h2 { font-size: 1em; color: #aab; margin-bottom: 8px; text-align: center; }
+  canvas { display: block; border-radius: 8px; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 16px;
+    justify-content: center;
+    align-items: center;
+  }
+  .control-group { display: flex; align-items: center; gap: 6px; }
+  .control-group label { font-size: 0.85em; color: #aab; white-space: nowrap; }
+  input[type="range"] {
+    width: 120px;
+    accent-color: #e94560;
+  }
+  .val { font-size: 0.85em; color: #e94560; min-width: 40px; }
+  button {
+    background: #e94560;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+  }
+  button:hover { background: #c73650; }
+  .legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .info {
+    max-width: 1200px;
+    width: 100%;
+    background: #16213e;
+    border-radius: 12px;
+    padding: 16px 20px;
+    border: 1px solid #0f3460;
+    margin-top: 16px;
+    font-size: 0.9em;
+    line-height: 1.6;
+    color: #bbc;
+  }
+  .info strong { color: #e0e0ff; }
+</style>
+</head>
+<body>
+
+<h1>3-Phase AC Power</h1>
+<p class="subtitle">Interactive visualization of three-phase alternating current</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#ff4466"></div> Phase A (L1)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#44cc66"></div> Phase B (L2)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4488ff"></div> Phase C (L3)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div> Sum (Neutral)</div>
+</div>
+
+<div class="container" style="margin-top: 12px;">
+  <div class="panel">
+    <h2>Waveforms</h2>
+    <canvas id="waveCanvas" width="660" height="300"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Phasor Diagram</h2>
+    <canvas id="phasorCanvas" width="300" height="300"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Frequency:</label>
+    <input type="range" id="freqSlider" min="0.5" max="5" step="0.1" value="1.5">
+    <span class="val" id="freqVal">1.5 Hz</span>
+  </div>
+  <div class="control-group">
+    <label>Amplitude:</label>
+    <input type="range" id="ampSlider" min="0.2" max="1" step="0.05" value="0.8">
+    <span class="val" id="ampVal">80%</span>
+  </div>
+  <div class="control-group">
+    <label>Speed:</label>
+    <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1">
+    <span class="val" id="speedVal">1.0x</span>
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="resetBtn">Reset</button>
+</div>
+
+<div class="info">
+  <strong>How 3-Phase AC Works:</strong>
+  Three sinusoidal voltages are generated 120° apart in phase. This arrangement delivers
+  <strong>constant total power</strong> (the sum of all three phases is always zero in a balanced system),
+  enables efficient long-distance transmission, and powers large motors with a naturally rotating magnetic field.
+  Most power grids worldwide use 3-phase AC at 50 Hz or 60 Hz.
+  <br><br>
+  <a href="index.html" style="color:#58a6ff;">← All Demos</a>
+</div>
+
+<script>
+const waveCanvas = document.getElementById('waveCanvas');
+const phasorCanvas = document.getElementById('phasorCanvas');
+const wCtx = waveCanvas.getContext('2d');
+const pCtx = phasorCanvas.getContext('2d');
+
+const freqSlider = document.getElementById('freqSlider');
+const ampSlider = document.getElementById('ampSlider');
+const speedSlider = document.getElementById('speedSlider');
+const freqVal = document.getElementById('freqVal');
+const ampVal = document.getElementById('ampVal');
+const speedVal = document.getElementById('speedVal');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+const COLORS = ['#ff4466', '#44cc66', '#4488ff'];
+const SUM_COLOR = '#ffcc00';
+const PHASE_LABELS = ['A', 'B', 'C'];
+const PHASE_OFFSETS = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
+
+let time = 0;
+let paused = false;
+let lastTimestamp = 0;
+
+freqSlider.oninput = () => freqVal.textContent = freqSlider.value + ' Hz';
+ampSlider.oninput = () => ampVal.textContent = Math.round(ampSlider.value * 100) + '%';
+speedSlider.oninput = () => speedVal.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+
+pauseBtn.onclick = () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Play' : 'Pause';
+};
+
+resetBtn.onclick = () => {
+  time = 0;
+  freqSlider.value = 1.5; freqSlider.oninput();
+  ampSlider.value = 0.8; ampSlider.oninput();
+  speedSlider.value = 1; speedSlider.oninput();
+  paused = false;
+  pauseBtn.textContent = 'Pause';
+};
+
+function drawWaveforms() {
+  const W = waveCanvas.width, H = waveCanvas.height;
+  const freq = parseFloat(freqSlider.value);
+  const amp = parseFloat(ampSlider.value);
+  const midY = H / 2;
+  const yScale = (H / 2 - 30) * amp;
+
+  wCtx.clearRect(0, 0, W, H);
+
+  // grid
+  wCtx.strokeStyle = '#ffffff10';
+  wCtx.lineWidth = 1;
+  for (let y = 30; y < H - 20; y += (H - 50) / 8) {
+    wCtx.beginPath(); wCtx.moveTo(50, y); wCtx.lineTo(W - 10, y); wCtx.stroke();
+  }
+  for (let x = 50; x <= W - 10; x += (W - 60) / 8) {
+    wCtx.beginPath(); wCtx.moveTo(x, 30); wCtx.lineTo(x, H - 20); wCtx.stroke();
+  }
+
+  // axes
+  wCtx.strokeStyle = '#ffffff40';
+  wCtx.lineWidth = 1;
+  wCtx.beginPath(); wCtx.moveTo(50, midY); wCtx.lineTo(W - 10, midY); wCtx.stroke();
+  wCtx.beginPath(); wCtx.moveTo(50, 30); wCtx.lineTo(50, H - 20); wCtx.stroke();
+
+  // axis labels
+  wCtx.fillStyle = '#888';
+  wCtx.font = '11px sans-serif';
+  wCtx.textAlign = 'right';
+  wCtx.fillText('+V', 45, 38);
+  wCtx.fillText('0', 45, midY + 4);
+  wCtx.fillText('-V', 45, H - 22);
+  wCtx.textAlign = 'center';
+  wCtx.fillText('Time →', W / 2, H - 4);
+
+  const plotW = W - 60;
+  const cycles = 2;
+
+  // draw each phase
+  for (let p = 0; p < 3; p++) {
+    wCtx.strokeStyle = COLORS[p];
+    wCtx.lineWidth = 2.5;
+    wCtx.shadowColor = COLORS[p];
+    wCtx.shadowBlur = 6;
+    wCtx.beginPath();
+    for (let i = 0; i <= plotW; i++) {
+      const t = (i / plotW) * cycles;
+      const v = Math.sin(2 * Math.PI * freq * t - PHASE_OFFSETS[p] + time * freq * 2 * Math.PI);
+      const x = 50 + i;
+      const y = midY - v * yScale;
+      i === 0 ? wCtx.moveTo(x, y) : wCtx.lineTo(x, y);
+    }
+    wCtx.stroke();
+    wCtx.shadowBlur = 0;
+  }
+
+  // sum
+  wCtx.strokeStyle = SUM_COLOR;
+  wCtx.lineWidth = 1.5;
+  wCtx.setLineDash([6, 4]);
+  wCtx.beginPath();
+  for (let i = 0; i <= plotW; i++) {
+    const t = (i / plotW) * cycles;
+    let sum = 0;
+    for (let p = 0; p < 3; p++) {
+      sum += Math.sin(2 * Math.PI * freq * t - PHASE_OFFSETS[p] + time * freq * 2 * Math.PI);
+    }
+    const x = 50 + i;
+    const y = midY - sum * yScale;
+    i === 0 ? wCtx.moveTo(x, y) : wCtx.lineTo(x, y);
+  }
+  wCtx.stroke();
+  wCtx.setLineDash([]);
+
+  // phase labels at right edge
+  for (let p = 0; p < 3; p++) {
+    const t = cycles;
+    const v = Math.sin(2 * Math.PI * freq * t - PHASE_OFFSETS[p] + time * freq * 2 * Math.PI);
+    const y = midY - v * yScale;
+    wCtx.fillStyle = COLORS[p];
+    wCtx.font = 'bold 12px sans-serif';
+    wCtx.textAlign = 'left';
+    wCtx.fillText(PHASE_LABELS[p], W - 8, y + 4);
+  }
+
+  // moving time marker
+  const markerX = 50 + (((time * freq) % 1) / 1) * plotW;
+  wCtx.strokeStyle = '#ffffff30';
+  wCtx.lineWidth = 1;
+  wCtx.beginPath();
+  wCtx.moveTo(markerX, 30);
+  wCtx.lineTo(markerX, H - 20);
+  wCtx.stroke();
+
+  // dots on marker line
+  for (let p = 0; p < 3; p++) {
+    const t = ((markerX - 50) / plotW) * cycles;
+    const v = Math.sin(2 * Math.PI * freq * t - PHASE_OFFSETS[p] + time * freq * 2 * Math.PI);
+    const y = midY - v * yScale;
+    wCtx.beginPath();
+    wCtx.arc(markerX, y, 5, 0, Math.PI * 2);
+    wCtx.fillStyle = COLORS[p];
+    wCtx.fill();
+    wCtx.strokeStyle = '#fff';
+    wCtx.lineWidth = 1.5;
+    wCtx.stroke();
+  }
+}
+
+function drawPhasors() {
+  const W = phasorCanvas.width, H = phasorCanvas.height;
+  const cx = W / 2, cy = H / 2;
+  const freq = parseFloat(freqSlider.value);
+  const amp = parseFloat(ampSlider.value);
+  const radius = (Math.min(W, H) / 2 - 30) * amp;
+
+  pCtx.clearRect(0, 0, W, H);
+
+  // concentric circles
+  pCtx.strokeStyle = '#ffffff10';
+  pCtx.lineWidth = 1;
+  for (let r = radius / 3; r <= radius; r += radius / 3) {
+    pCtx.beginPath();
+    pCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    pCtx.stroke();
+  }
+
+  // crosshair
+  pCtx.strokeStyle = '#ffffff20';
+  pCtx.beginPath(); pCtx.moveTo(10, cy); pCtx.lineTo(W - 10, cy); pCtx.stroke();
+  pCtx.beginPath(); pCtx.moveTo(cx, 10); pCtx.lineTo(cx, H - 10); pCtx.stroke();
+
+  const baseAngle = time * freq * 2 * Math.PI;
+
+  // draw phasors
+  for (let p = 0; p < 3; p++) {
+    const angle = baseAngle - PHASE_OFFSETS[p];
+    const ex = cx + Math.cos(angle) * radius;
+    const ey = cy - Math.sin(angle) * radius;
+
+    // trail
+    pCtx.strokeStyle = COLORS[p] + '15';
+    pCtx.lineWidth = 1;
+    pCtx.beginPath();
+    pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    pCtx.stroke();
+
+    // arrow line
+    pCtx.strokeStyle = COLORS[p];
+    pCtx.lineWidth = 3;
+    pCtx.shadowColor = COLORS[p];
+    pCtx.shadowBlur = 8;
+    pCtx.beginPath();
+    pCtx.moveTo(cx, cy);
+    pCtx.lineTo(ex, ey);
+    pCtx.stroke();
+    pCtx.shadowBlur = 0;
+
+    // arrowhead
+    const headLen = 12;
+    const headAngle = Math.atan2(cy - ey, ex - cx);
+    pCtx.fillStyle = COLORS[p];
+    pCtx.beginPath();
+    pCtx.moveTo(ex, ey);
+    pCtx.lineTo(
+      ex - headLen * Math.cos(headAngle - 0.4),
+      ey + headLen * Math.sin(headAngle - 0.4)
+    );
+    pCtx.lineTo(
+      ex - headLen * Math.cos(headAngle + 0.4),
+      ey + headLen * Math.sin(headAngle + 0.4)
+    );
+    pCtx.closePath();
+    pCtx.fill();
+
+    // label
+    const lx = cx + Math.cos(angle) * (radius + 18);
+    const ly = cy - Math.sin(angle) * (radius + 18);
+    pCtx.fillStyle = COLORS[p];
+    pCtx.font = 'bold 13px sans-serif';
+    pCtx.textAlign = 'center';
+    pCtx.textBaseline = 'middle';
+    pCtx.fillText(PHASE_LABELS[p], lx, ly);
+  }
+
+  // center dot
+  pCtx.beginPath();
+  pCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+  pCtx.fillStyle = '#fff';
+  pCtx.fill();
+
+  // angle labels
+  pCtx.fillStyle = '#666';
+  pCtx.font = '10px sans-serif';
+  pCtx.textAlign = 'center';
+  pCtx.fillText('0°', W - 16, cy - 4);
+  pCtx.fillText('90°', cx, 14);
+  pCtx.fillText('180°', 20, cy - 4);
+  pCtx.fillText('270°', cx, H - 6);
+}
+
+function animate(timestamp) {
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  const dt = (timestamp - lastTimestamp) / 1000;
+  lastTimestamp = timestamp;
+
+  if (!paused) {
+    time += dt * parseFloat(speedSlider.value);
+  }
+
+  drawWaveforms();
+  drawPhasors();
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
