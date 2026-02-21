@@ -357,28 +357,53 @@ function drawCircuit() {
     // Vφ annotation
     drawVAnnotation(ctx, nx - 2, cy - 6, nx - 2, yA + 6, 'Vφ,src', '#58a6ff', -22);
   } else {
-    const dx = srcX - 50;
+    // Delta source — real triangle
+    // Triangle vertices: A=top-right, B=bottom, C=top-left
+    const tcx = srcX + 10; // triangle center x
+    const triR = 70;       // triangle radius
+    // Vertices at 30°, 270°, 150° so A is top-right, B is bottom, C is top-left
+    const angles = [Math.PI/6, -Math.PI/2, 5*Math.PI/6];
+    const tv = angles.map(a => ({x: tcx + triR * Math.cos(a), y: cy - triR * Math.sin(a)}));
+    // tv[0]=A (top-right), tv[1]=B (bottom), tv[2]=C (top-left)
+
+    // Draw three sides with AC sources: side AB, BC, CA
+    const sides = [[0,1],[1,2],[2,0]]; // vertex pairs
+    for (let s = 0; s < 3; s++) {
+      const [vi, vj] = sides[s];
+      const p1 = tv[vi], p2 = tv[vj];
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const r = 14;
+      // Wire from vertex to just before source
+      const bx1 = mx - Math.cos(ang) * (r + 8), by1 = my - Math.sin(ang) * (r + 8);
+      const bx2 = mx + Math.cos(ang) * (r + 8), by2 = my + Math.sin(ang) * (r + 8);
+      ctx.strokeStyle = pc[s]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(bx1, by1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx2, by2); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      // AC source circle at midpoint
+      drawACSourceAngled(ctx, mx, my, r, ang, pc[s]);
+      // Polarity marks
+      const nx = -Math.sin(ang), ny = Math.cos(ang); // normal
+      ctx.fillStyle = pc[s]; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('+', bx1 + nx * 14, by1 + ny * 14);
+      ctx.fillText('−', bx2 + nx * 14, by2 + ny * 14);
+    }
+
+    // Dots at vertices and wires to terminals
     for (let i = 0; i < 3; i++) {
-      const j = (i + 1) % 3;
-      const my = (ys[i] + ys[j]) / 2;
+      drawDot(ctx, tv[i].x, tv[i].y, pc[i], 4);
       ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
-      // Vertical wire above source
-      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 18); ctx.stroke();
-      drawACSourceV(ctx, dx, my, pc[i], 16);
-      // Vertical wire below source
-      ctx.beginPath(); ctx.moveTo(dx, my + 18); ctx.lineTo(dx, ys[j]); ctx.stroke();
-      // Horizontal wire junction → terminal
-      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(lineL, ys[i]); ctx.stroke();
-      drawDot(ctx, dx, ys[i], pc[i], 4);
+      ctx.beginPath(); ctx.moveTo(tv[i].x, tv[i].y); ctx.lineTo(lineL, ys[i]); ctx.stroke();
       drawDot(ctx, lineL, ys[i], pc[i], 4);
-      // Phase label
       ctx.fillStyle = pc[i]; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(LABELS[i], lineL, ys[i] - 14);
-      // Polarity
-      ctx.font = '10px sans-serif';
-      ctx.fillText('+', dx - 16, my - 14); ctx.fillText('−', dx - 16, my + 18);
+      // Vertex label
+      ctx.font = 'bold 11px sans-serif';
+      const loff = 14;
+      ctx.fillText(LABELS[i], tv[i].x + (tv[i].x < tcx ? -loff : loff), tv[i].y + (tv[i].y > cy ? loff : -loff));
     }
-    drawVAnnotation(ctx, dx - 26, ys[0] + 6, dx - 26, ys[1] - 6, 'Vφ,src', '#58a6ff', -20);
+    // Vφ annotation (along side AB)
+    drawVAnnotation(ctx, tv[2].x - 6, tv[2].y, tv[2].x - 6, tv[1].y, 'Vφ,src', '#58a6ff', -22);
   }
 
   // ═══ Draw Line Wires ═══
@@ -446,36 +471,53 @@ function drawCircuit() {
     ctx.fillStyle = '#d2a8ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', ldX, yC + 28);
   } else {
-    // Delta load
-    const dx = ldX + 50;
-    for (let i = 0; i < 3; i++) {
-      const j = (i + 1) % 3;
-      const y = ys[i];
-      // Wire terminal → junction
-      ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(lineR, y); ctx.lineTo(dx, y); ctx.stroke();
-      drawDot(ctx, lineR, y, pc[i], 4);
-      drawDot(ctx, dx, y, pc[i], 4);
-      // Delta branch: vertical impedance between i and j
-      const my = (ys[i] + ys[j]) / 2;
-      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 28); ctx.stroke();
-      drawZigzagV(ctx, dx, my, pc[i]);
-      ctx.beginPath(); ctx.moveTo(dx, my + 28); ctx.lineTo(dx, ys[j]); ctx.stroke();
+    // Delta load — real triangle
+    const lcx = ldX - 10;
+    const triR = 70;
+    const angles = [Math.PI/6, -Math.PI/2, 5*Math.PI/6];
+    const tv = angles.map(a => ({x: lcx + triR * Math.cos(a), y: cy - triR * Math.sin(a)}));
+
+    // Draw three sides with zigzag impedances: AB, BC, CA
+    const sides = [[0,1],[1,2],[2,0]];
+    for (let s = 0; s < 3; s++) {
+      const [vi, vj] = sides[s];
+      const p1 = tv[vi], p2 = tv[vj];
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const halfLen = 24;
+      // Wire from vertex to just before impedance
+      const bx1 = mx - Math.cos(ang) * (halfLen + 4), by1 = my - Math.sin(ang) * (halfLen + 4);
+      const bx2 = mx + Math.cos(ang) * (halfLen + 4), by2 = my + Math.sin(ang) * (halfLen + 4);
+      ctx.strokeStyle = pc[s]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(bx1, by1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx2, by2); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      drawZigzagAngled(ctx, mx, my, halfLen, ang, pc[s]);
       // Iφ label
-      ctx.fillStyle = pc[i]; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText('Iφ' + LABELS[i] + LABELS[j], dx + 16, my + 4);
-      // Iφ value
-      ctx.font = '10px sans-serif'; ctx.fillStyle = pc[i] + '80';
-      ctx.fillText(fmtV(res.IpL) + ' A', dx + 16, my + 18);
-      // Phase label at terminal
+      const nx = -Math.sin(ang), ny = Math.cos(ang);
+      ctx.fillStyle = pc[s]; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Iφ' + LABELS[vi] + LABELS[vj], mx + nx * 26, my + ny * 26);
+      ctx.font = '9px sans-serif'; ctx.fillStyle = pc[s] + '80';
+      ctx.fillText(fmtV(res.IpL) + ' A', mx + nx * 26, my + ny * 26 + 12);
+    }
+
+    // Dots at vertices and wires to line terminals
+    for (let i = 0; i < 3; i++) {
+      drawDot(ctx, tv[i].x, tv[i].y, pc[i], 4);
+      ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lineR, ys[i]); ctx.lineTo(tv[i].x, tv[i].y); ctx.stroke();
+      drawDot(ctx, lineR, ys[i], pc[i], 4);
       ctx.fillStyle = pc[i]; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(LABELS[i], lineR, y - 14);
+      ctx.fillText(LABELS[i], lineR, ys[i] - 14);
+      // Vertex label
+      ctx.font = 'bold 11px sans-serif';
+      const loff = 14;
+      ctx.fillText(LABELS[i], tv[i].x + (tv[i].x < lcx ? -loff : loff), tv[i].y + (tv[i].y > cy ? loff : -loff));
     }
     // Vφ annotation
-    drawVAnnotation(ctx, dx + 6, ys[0] + 8, dx + 6, ys[1] - 8, 'Vφ,load', '#3fb950', 18);
+    drawVAnnotation(ctx, tv[0].x + 6, tv[0].y, tv[0].x + 6, tv[1].y, 'Vφ,load', '#3fb950', 18);
     // Z label
     ctx.fillStyle = '#d2a8ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', dx + 6, yC + 28);
+    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', lcx, yC + 42);
   }
 
   // ═══ Config summary at bottom ═══
@@ -536,6 +578,49 @@ function drawACSourceV(ctx, x, my, color, r) {
     t === -1 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   }
   ctx.stroke();
+}
+
+function drawACSourceAngled(ctx, mx, my, r, angle, color) {
+  ctx.beginPath(); ctx.arc(mx, my, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d1117'; ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  // Sine wave along the angle direction
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  for (let t = -1; t <= 1; t += 0.04) {
+    const along = t * (r - 4);
+    const perp = -Math.sin(t * Math.PI) * (r * 0.5);
+    const px = mx + along * ca + perp * (-sa);
+    const py = my + along * sa + perp * ca;
+    t === -1 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+
+function drawZigzagAngled(ctx, mx, my, halfLen, angle, color) {
+  const segs = 6;
+  const segLen = (halfLen * 2) / segs;
+  const amp = 9;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const nx = -sa, ny = ca;
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(mx - halfLen * ca, my - halfLen * sa);
+  for (let s = 0; s < segs; s++) {
+    const base = -halfLen + s * segLen;
+    const t1 = base + segLen * 0.25;
+    ctx.lineTo(mx + t1 * ca + amp * nx, my + t1 * sa + amp * ny);
+    const t2 = base + segLen * 0.75;
+    ctx.lineTo(mx + t2 * ca - amp * nx, my + t2 * sa - amp * ny);
+    const t3 = base + segLen;
+    ctx.lineTo(mx + t3 * ca, my + t3 * sa);
+  }
+  ctx.stroke();
+  ctx.fillStyle = color; ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Z', mx + (amp + 10) * nx, my + (amp + 10) * ny);
+  ctx.textBaseline = 'alphabetic';
 }
 
 function drawZigzagH(ctx, x1, y, x2, y2, color) {
