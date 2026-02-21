@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karnaugh Map — Boolean Function Simplifier</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:18px}
+  h1{font-size:1.5em;color:#e0e0ff}
+  .subtitle{color:#7d8590;margin-bottom:10px;font-size:.92em;text-align:center;max-width:820px}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+  .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.86em;
+    background:#161b22;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .tab:hover{border-color:#58a6ff;color:#e6edf3}
+  .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
+
+  /* Layout */
+  .main-row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:10px;max-width:1200px;width:100%}
+  .panel{background:#161b22;border-radius:12px;padding:16px;border:1px solid #30363d}
+  .panel h2{font-size:.9em;color:#8b949e;margin-bottom:8px;text-align:center}
+
+  /* K-map grid */
+  .kmap-wrap{display:flex;flex-direction:column;align-items:center;position:relative}
+  .kmap-label{font-size:.82em;color:#8b949e;margin-bottom:4px;font-weight:bold}
+  .kmap-table{border-collapse:collapse;position:relative}
+  .kmap-table td{width:56px;height:52px;text-align:center;vertical-align:middle;
+    border:1px solid #30363d;cursor:pointer;font-size:1.1em;font-weight:bold;
+    font-family:'Courier New',monospace;transition:background .15s;position:relative;user-select:none}
+  .kmap-table td:hover{border-color:#58a6ff}
+  .kmap-table td.v1{color:#3fb950;background:#3fb95018}
+  .kmap-table td.v0{color:#484f58;background:transparent}
+  .kmap-table td.vx{color:#d29922;background:#d2992210}
+  .kmap-table .hdr{background:#161b22;color:#8b949e;font-size:.78em;font-weight:normal;cursor:default;
+    border:none;width:auto;height:auto;padding:4px 8px}
+  .kmap-table .hdr-var{color:#bc8cff;font-weight:bold;font-size:.85em}
+  .kmap-table .corner{border:none;cursor:default;background:transparent}
+  .minterm-idx{position:absolute;bottom:2px;right:4px;font-size:.6em;color:#484f58;font-weight:normal}
+
+  /* Group overlays */
+  .group-overlay{position:absolute;border-radius:10px;pointer-events:none;z-index:2}
+
+  /* Truth table */
+  .tt-wrap{max-height:420px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#30363d #161b22}
+  .tt{border-collapse:collapse;width:100%;font-size:.82em;font-family:'Courier New',monospace}
+  .tt th{background:#21262d;color:#8b949e;padding:4px 8px;border:1px solid #30363d;
+    position:sticky;top:0;font-size:.78em;text-transform:uppercase}
+  .tt td{padding:4px 8px;border:1px solid #30363d;text-align:center;cursor:pointer;transition:background .15s}
+  .tt td:hover{background:#30363d}
+  .tt td.out1{color:#3fb950;font-weight:bold}
+  .tt td.out0{color:#484f58}
+  .tt td.outx{color:#d29922}
+
+  /* Expression */
+  .expr-box{background:#0d1117;border:1px solid #30363d;border-radius:10px;
+    padding:12px 18px;margin-top:10px;text-align:center;min-height:48px;max-width:700px;width:100%}
+  .expr{font-size:1.15em;font-family:'Courier New',monospace;color:#3fb950;letter-spacing:.5px}
+  .expr-label{font-size:.78em;color:#8b949e;margin-bottom:4px}
+  .expr-pos{font-size:1em;font-family:'Courier New',monospace;color:#58a6ff;margin-top:6px}
+
+  /* Controls */
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;justify-content:center;align-items:center}
+  button{background:#238636;color:white;border:none;padding:6px 14px;border-radius:6px;
+    cursor:pointer;font-size:.82em;transition:.2s}
+  button:hover{background:#2ea043}
+  button.sec{background:#30363d}
+  button.sec:hover{background:#484f58}
+  button.danger{background:#da3633}
+  button.danger:hover{background:#b62324}
+  .presets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .preset{padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.74em;
+    background:#21262d;border:1px solid #30363d;color:#8b949e;transition:.2s}
+  .preset:hover{border-color:#58a6ff;color:#e6edf3}
+
+  /* Gate diagram */
+  canvas{display:block;border-radius:10px}
+
+  /* Info */
+  .info{max-width:1200px;width:100%;background:#161b22;border-radius:12px;
+    padding:14px 18px;border:1px solid #30363d;margin-top:14px;font-size:.84em;line-height:1.6;color:#8b949e}
+  .info strong{color:#e0e0ff}
+  .info code{color:#f78166;background:#21262d;padding:1px 4px;border-radius:3px}
+  a{color:#58a6ff}
+
+  /* Steps panel */
+  .steps{font-size:.8em;line-height:1.7;color:#8b949e;margin-top:8px}
+  .steps .step{padding:3px 0;border-bottom:1px solid #21262d}
+  .steps .step:last-child{border-bottom:none}
+  .steps .group-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.85em;margin-right:4px;font-weight:bold}
+  .steps .essential{color:#3fb950}
+</style>
+</head>
+<body>
+
+<h1>Karnaugh Map — Boolean Simplifier</h1>
+<p class="subtitle">Click cells to toggle 0 / 1 / X (don't-care). Watch the K-map automatically find prime implicants and produce the minimal SOP & POS expressions.</p>
+
+<div class="tabs">
+  <div class="tab active" data-vars="2">2 Variables</div>
+  <div class="tab" data-vars="3">3 Variables</div>
+  <div class="tab" data-vars="4">4 Variables</div>
+</div>
+
+<div class="main-row">
+  <!-- K-map panel -->
+  <div class="panel" style="min-width:320px">
+    <h2>Karnaugh Map</h2>
+    <div class="kmap-wrap" id="kmapWrap">
+      <div class="kmap-label" id="kmapLabel"></div>
+      <div style="position:relative;display:inline-block" id="kmapContainer">
+        <table class="kmap-table" id="kmapTable"></table>
+      </div>
+    </div>
+    <div class="controls" style="margin-top:12px">
+      <button id="btnAllZero" class="sec">All 0</button>
+      <button id="btnAllOne">All 1</button>
+      <button id="btnRandom" class="sec">Random</button>
+      <button id="btnInvert" class="sec">Invert</button>
+      <button id="btnClear" class="danger">Clear X→0</button>
+    </div>
+    <div class="presets" id="presetBox"></div>
+  </div>
+
+  <!-- Truth table -->
+  <div class="panel" style="min-width:200px;max-width:280px">
+    <h2>Truth Table</h2>
+    <div class="tt-wrap" id="ttWrap"></div>
+  </div>
+
+  <!-- Steps & groups -->
+  <div class="panel" style="min-width:260px;max-width:360px">
+    <h2>Simplification Steps</h2>
+    <div class="steps" id="stepsBox"></div>
+  </div>
+</div>
+
+<!-- Expressions -->
+<div class="expr-box">
+  <div class="expr-label">Minimized Sum-of-Products (SOP)</div>
+  <div class="expr" id="exprSOP">F = 0</div>
+  <div class="expr-label" style="margin-top:8px">Minimized Product-of-Sums (POS)</div>
+  <div class="expr-pos" id="exprPOS">F = 1</div>
+</div>
+
+<!-- Gate diagram -->
+<div class="main-row">
+  <div class="panel" style="min-width:600px">
+    <h2>Logic Gate Diagram</h2>
+    <canvas id="gateCanvas" width="700" height="200"></canvas>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Karnaugh Map (K-map)</strong> is a graphical method for simplifying Boolean algebra expressions.
+  Cells are arranged in <strong>Gray code</strong> order so that adjacent cells differ by exactly one variable — this makes it easy to spot groups of 1s that can be combined.
+  <br><br>
+  <strong>Rules:</strong>
+  Groups must be rectangular and contain <strong>2<sup>k</sup></strong> cells (1, 2, 4, 8, or 16).
+  Groups can <strong>wrap around</strong> edges. Each group eliminates the variables that change within it.
+  <strong>Don't-care (X)</strong> cells can be included in groups to make them larger, but don't require coverage.
+  <br><br>
+  <strong>Presets</strong> include classic functions like XOR, multiplexer, majority voter, parity, and BCD-to-7-segment.
+  <br><br>
+  <a href="index.html">← 3-Phase AC</a> ·
+  <a href="bounce-diagram.html">Bounce Diagram</a> ·
+  <a href="transformer.html">Transformer</a> ·
+  <a href="maxwell.html">Maxwell's Equations</a> ·
+  <a href="poynting.html">Poynting Theorem</a> ·
+  <a href="vectors.html">Dot &amp; Cross Product</a> ·
+  <a href="phasor-transform.html">Phasor Transform</a> ·
+  <a href="sawtooth-transmission.html">Sawtooth Transmission</a>
+</div>
+
+<script>
+// ── Configuration ──
+const VAR_NAMES = ['A','B','C','D'];
+const GROUP_COLORS = [
+  '#ff6b6b','#ffa94d','#69db7c','#4dabf7','#da77f2',
+  '#38d9a9','#ffd43b','#f783ac','#748ffc','#ff8787'
+];
+
+let numVars = 2;
+let cells = []; // flat array of cell values: 0, 1, 2(don't care)
+let rows, cols;
+let rowBits, colBits;
+let grayRow, grayCol;
+let groups = []; // found prime implicant groups
+
+// Gray code sequences
+function grayCode(n) {
+  if (n === 0) return [0];
+  if (n === 1) return [0, 1];
+  const prev = grayCode(n - 1);
+  return [...prev.map(x => x), ...prev.slice().reverse().map(x => x | (1 << (n-1)))];
+}
+
+function bitsToStr(val, n) {
+  return val.toString(2).padStart(n, '0');
+}
+
+// ── Initialize ──
+function init() {
+  if (numVars === 2) { rowBits = 1; colBits = 1; }
+  else if (numVars === 3) { rowBits = 1; colBits = 2; }
+  else { rowBits = 2; colBits = 2; }
+  rows = 1 << rowBits;
+  cols = 1 << colBits;
+  grayRow = grayCode(rowBits);
+  grayCol = grayCode(colBits);
+  if (cells.length !== rows * cols) {
+    cells = new Array(rows * cols).fill(0);
+  }
+  buildKmap();
+  buildTruthTable();
+  solve();
+}
+
+// ── Minterm index from K-map position ──
+function minterм(r, c) {
+  return (grayRow[r] << colBits) | grayCol[c];
+}
+
+// ── Build K-map table ──
+function buildKmap() {
+  const table = document.getElementById('kmapTable');
+  const container = document.getElementById('kmapContainer');
+  // Remove old overlays
+  container.querySelectorAll('.group-overlay').forEach(el => el.remove());
+
+  const varR = VAR_NAMES.slice(0, rowBits).join('');
+  const varC = VAR_NAMES.slice(rowBits, numVars).join('');
+  document.getElementById('kmapLabel').textContent = `${numVars}-variable K-map: F(${VAR_NAMES.slice(0, numVars).join(',')})`;
+
+  let html = '<tr>';
+  html += `<td class="corner hdr"><span class="hdr-var">${varR}\\${varC}</span></td>`;
+  for (let c = 0; c < cols; c++) {
+    html += `<td class="hdr">${bitsToStr(grayCol[c], colBits)}</td>`;
+  }
+  html += '</tr>';
+
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    html += `<td class="hdr">${bitsToStr(grayRow[r], rowBits)}</td>`;
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const mt = minterм(r, c);
+      const v = cells[idx];
+      const cls = v === 1 ? 'v1' : v === 2 ? 'vx' : 'v0';
+      const txt = v === 1 ? '1' : v === 2 ? 'X' : '0';
+      html += `<td class="${cls}" data-idx="${idx}" data-r="${r}" data-c="${c}">`;
+      html += `${txt}<span class="minterm-idx">m${mt}</span></td>`;
+    }
+    html += '</tr>';
+  }
+  table.innerHTML = html;
+
+  // Click handlers
+  table.querySelectorAll('td[data-idx]').forEach(td => {
+    td.addEventListener('click', () => {
+      const idx = +td.dataset.idx;
+      cells[idx] = (cells[idx] + 1) % 3; // 0 → 1 → X → 0
+      buildKmap();
+      buildTruthTable();
+      solve();
+    });
+  });
+}
+
+// ── Build truth table ──
+function buildTruthTable() {
+  const wrap = document.getElementById('ttWrap');
+  let html = '<table class="tt"><thead><tr>';
+  for (let i = 0; i < numVars; i++) html += `<th>${VAR_NAMES[i]}</th>`;
+  html += '<th>F</th></tr></thead><tbody>';
+
+  const total = 1 << numVars;
+  for (let m = 0; m < total; m++) {
+    html += '<tr>';
+    for (let i = numVars - 1; i >= 0; i--) {
+      html += `<td>${(m >> i) & 1}</td>`;
+    }
+    // Find k-map cell for this minterm
+    const rVal = m >> colBits;
+    const cVal = m & ((1 << colBits) - 1);
+    const r = grayRow.indexOf(rVal);
+    const c = grayCol.indexOf(cVal);
+    const idx = r * cols + c;
+    const v = cells[idx];
+    const cls = v === 1 ? 'out1' : v === 2 ? 'outx' : 'out0';
+    const txt = v === 1 ? '1' : v === 2 ? 'X' : '0';
+    html += `<td class="${cls}" data-tt-m="${m}">${txt}</td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  // Click on truth table output to toggle
+  wrap.querySelectorAll('td[data-tt-m]').forEach(td => {
+    td.addEventListener('click', () => {
+      const m = +td.dataset.ttM;
+      const rVal = m >> colBits;
+      const cVal = m & ((1 << colBits) - 1);
+      const r = grayRow.indexOf(rVal);
+      const c = grayCol.indexOf(cVal);
+      const idx = r * cols + c;
+      cells[idx] = (cells[idx] + 1) % 3;
+      buildKmap();
+      buildTruthTable();
+      solve();
+    });
+  });
+}
+
+// ── K-map solver ──
+// Find all prime implicants, then minimum cover
+
+function solve() {
+  // Collect minterms (value=1) and don't-cares (value=2)
+  const ones = new Set();
+  const dcs = new Set();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = cells[r * cols + c];
+      const mt = minterм(r, c);
+      if (v === 1) ones.add(mt);
+      else if (v === 2) dcs.add(mt);
+    }
+  }
+
+  if (ones.size === 0) {
+    groups = [];
+    drawGroups();
+    document.getElementById('exprSOP').textContent = 'F = 0';
+    document.getElementById('exprPOS').textContent = 'F = 1';
+    document.getElementById('stepsBox').innerHTML = '<div class="step">No 1-cells — function is always 0.</div>';
+    drawGates([]);
+    return;
+  }
+
+  // Check if all are 1 or X
+  const total = 1 << numVars;
+  const zeros = new Set();
+  for (let m = 0; m < total; m++) {
+    if (!ones.has(m) && !dcs.has(m)) zeros.add(m);
+  }
+  if (zeros.size === 0 && dcs.size === 0) {
+    groups = [];
+    drawGroups();
+    document.getElementById('exprSOP').textContent = 'F = 1';
+    document.getElementById('exprPOS').textContent = 'F = 0';
+    document.getElementById('stepsBox').innerHTML = '<div class="step">All cells are 1 — function is always 1.</div>';
+    drawGates([{term: '1', vars: [], essential: true}]);
+    return;
+  }
+
+  // Enumerate all valid rectangular groups on the K-map
+  const allGroups = [];
+  const heights = [];
+  const widths = [];
+  for (let h = 1; h <= rows; h *= 2) heights.push(h);
+  for (let w = 1; w <= cols; w *= 2) widths.push(w);
+
+  for (const h of heights) {
+    for (const w of widths) {
+      const size = h * w;
+      if (size < 1) continue;
+      // Check power of 2
+      if ((size & (size - 1)) !== 0) continue;
+
+      for (let r0 = 0; r0 < rows; r0++) {
+        for (let c0 = 0; c0 < cols; c0++) {
+          // Collect minterms in this group
+          const mts = new Set();
+          let valid = true;
+          for (let dr = 0; dr < h && valid; dr++) {
+            for (let dc = 0; dc < w && valid; dc++) {
+              const r = (r0 + dr) % rows;
+              const c = (c0 + dc) % cols;
+              const mt = minterм(r, c);
+              if (!ones.has(mt) && !dcs.has(mt)) {
+                valid = false;
+              } else {
+                mts.add(mt);
+              }
+            }
+          }
+          if (!valid) continue;
+          // Must cover at least one actual 1
+          let coversOne = false;
+          for (const mt of mts) { if (ones.has(mt)) { coversOne = true; break; } }
+          if (!coversOne) continue;
+          allGroups.push({ r0, c0, h, w, minterms: mts, size: mts.size });
+        }
+      }
+    }
+  }
+
+  // Find prime implicants: groups not contained in any larger group
+  const primeImplicants = [];
+  for (let i = 0; i < allGroups.length; i++) {
+    let isPrime = true;
+    for (let j = 0; j < allGroups.length; j++) {
+      if (i === j) continue;
+      if (allGroups[j].size <= allGroups[i].size) continue;
+      // Check if allGroups[i].minterms ⊂ allGroups[j].minterms
+      let subset = true;
+      for (const mt of allGroups[i].minterms) {
+        if (!allGroups[j].minterms.has(mt)) { subset = false; break; }
+      }
+      if (subset) { isPrime = false; break; }
+    }
+    if (isPrime) {
+      // Deduplicate (same set of minterms)
+      let dup = false;
+      for (const pi of primeImplicants) {
+        if (pi.minterms.size === allGroups[i].minterms.size) {
+          let same = true;
+          for (const mt of pi.minterms) {
+            if (!allGroups[i].minterms.has(mt)) { same = false; break; }
+          }
+          if (same) { dup = true; break; }
+        }
+      }
+      if (!dup) primeImplicants.push(allGroups[i]);
+    }
+  }
+
+  // Find essential prime implicants
+  // A PI is essential if it's the only one covering some minterm in 'ones'
+  const essential = new Set();
+  const covered = new Set();
+  for (const mt of ones) {
+    const covering = [];
+    for (let i = 0; i < primeImplicants.length; i++) {
+      if (primeImplicants[i].minterms.has(mt)) covering.push(i);
+    }
+    if (covering.length === 1) {
+      essential.add(covering[0]);
+    }
+  }
+
+  // Mark covered by essentials
+  for (const i of essential) {
+    for (const mt of primeImplicants[i].minterms) {
+      if (ones.has(mt)) covered.add(mt);
+    }
+  }
+
+  // Greedy cover remaining uncovered minterms
+  const selected = new Set(essential);
+  const uncovered = new Set([...ones].filter(m => !covered.has(m)));
+
+  while (uncovered.size > 0) {
+    let bestIdx = -1, bestCount = 0;
+    for (let i = 0; i < primeImplicants.length; i++) {
+      if (selected.has(i)) continue;
+      let count = 0;
+      for (const mt of primeImplicants[i].minterms) {
+        if (uncovered.has(mt)) count++;
+      }
+      if (count > bestCount) { bestCount = count; bestIdx = i; }
+    }
+    if (bestIdx === -1) break;
+    selected.add(bestIdx);
+    for (const mt of primeImplicants[bestIdx].minterms) {
+      uncovered.delete(mt);
+    }
+  }
+
+  // Build groups for display
+  groups = [];
+  const selectedPIs = [...selected].sort((a, b) => a - b);
+  for (let gi = 0; gi < selectedPIs.length; gi++) {
+    const pi = primeImplicants[selectedPIs[gi]];
+    groups.push({
+      ...pi,
+      color: GROUP_COLORS[gi % GROUP_COLORS.length],
+      essential: essential.has(selectedPIs[gi]),
+      index: gi
+    });
+  }
+
+  drawGroups();
+  buildExpressions(groups, ones);
+  buildSteps(primeImplicants, groups, essential, selectedPIs);
+  drawGates(groups.map(g => ({ term: groupToTerm(g), vars: groupToVars(g), essential: g.essential })));
+}
+
+// ── Convert group to SOP term ──
+function groupToVars(group) {
+  // Determine which variables are fixed in this group
+  const mts = [...group.minterms];
+  const result = [];
+  for (let i = numVars - 1; i >= 0; i--) {
+    const bit = 1 << i;
+    const vals = new Set(mts.map(m => (m & bit) ? 1 : 0));
+    if (vals.size === 1) {
+      const varIdx = numVars - 1 - i;
+      result.push({ name: VAR_NAMES[varIdx], inverted: !vals.has(1) });
+    }
+  }
+  return result;
+}
+
+function groupToTerm(group) {
+  const vars = groupToVars(group);
+  if (vars.length === 0) return '1';
+  return vars.map(v => v.inverted ? v.name + "'" : v.name).join('');
+}
+
+function groupToPOSTerm(group) {
+  // For POS, we need the complement: if variable is 1 in group, it appears complemented in POS
+  const vars = groupToVars(group);
+  if (vars.length === 0) return '0';
+  return '(' + vars.map(v => v.inverted ? v.name : v.name + "'").join(' + ') + ')';
+}
+
+function buildExpressions(grps, ones) {
+  // SOP
+  if (grps.length === 0) {
+    document.getElementById('exprSOP').textContent = 'F = 0';
+    document.getElementById('exprPOS').textContent = 'F = 1';
+    return;
+  }
+
+  const sopTerms = grps.map(g => groupToTerm(g));
+  const sopStr = sopTerms.length === 1 && sopTerms[0] === '1'
+    ? 'F = 1'
+    : 'F = ' + sopTerms.join(' + ');
+  document.getElementById('exprSOP').textContent = sopStr;
+
+  // POS — solve for zeros
+  const total = 1 << numVars;
+  const zeros = [];
+  for (let m = 0; m < total; m++) {
+    const rVal = m >> colBits;
+    const cVal = m & ((1 << colBits) - 1);
+    const r = grayRow.indexOf(rVal);
+    const c = grayCol.indexOf(cVal);
+    const idx = r * cols + c;
+    if (cells[idx] === 0) zeros.push(m);
+  }
+
+  if (zeros.length === 0) {
+    document.getElementById('exprPOS').textContent = 'F = 1';
+    return;
+  }
+
+  // Quick POS: solve K-map for zeros to get POS terms
+  // For simplicity, compute maxterms from the zero-groups
+  // Run the same algorithm on zeros
+  const zeroSet = new Set(zeros);
+  const dcs = new Set();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (cells[r * cols + c] === 2) dcs.add(minterм(r, c));
+    }
+  }
+
+  const zeroGroups = findCover(zeroSet, dcs);
+  if (zeroGroups.length === 0) {
+    document.getElementById('exprPOS').textContent = 'F = 1';
+  } else {
+    const posTerms = zeroGroups.map(g => {
+      const vars = groupToVars(g);
+      if (vars.length === 0) return '0';
+      return '(' + vars.map(v => v.inverted ? v.name : v.name + "'").join(' + ') + ')';
+    });
+    document.getElementById('exprPOS').textContent = 'F = ' + posTerms.join('');
+  }
+}
+
+function findCover(targetSet, dcSet) {
+  if (targetSet.size === 0) return [];
+  const allGroups = [];
+  const heights = [];
+  const widths = [];
+  for (let h = 1; h <= rows; h *= 2) heights.push(h);
+  for (let w = 1; w <= cols; w *= 2) widths.push(w);
+
+  for (const h of heights) {
+    for (const w of widths) {
+      const size = h * w;
+      if ((size & (size - 1)) !== 0) continue;
+      for (let r0 = 0; r0 < rows; r0++) {
+        for (let c0 = 0; c0 < cols; c0++) {
+          const mts = new Set();
+          let valid = true;
+          for (let dr = 0; dr < h && valid; dr++) {
+            for (let dc = 0; dc < w && valid; dc++) {
+              const r = (r0 + dr) % rows;
+              const c = (c0 + dc) % cols;
+              const mt = minterм(r, c);
+              if (!targetSet.has(mt) && !dcSet.has(mt)) valid = false;
+              else mts.add(mt);
+            }
+          }
+          if (!valid) continue;
+          let coversTarget = false;
+          for (const mt of mts) { if (targetSet.has(mt)) { coversTarget = true; break; } }
+          if (!coversTarget) continue;
+          allGroups.push({ r0, c0, h, w, minterms: mts, size: mts.size });
+        }
+      }
+    }
+  }
+
+  // Prime implicants
+  const pis = [];
+  for (let i = 0; i < allGroups.length; i++) {
+    let isPrime = true;
+    for (let j = 0; j < allGroups.length; j++) {
+      if (i === j || allGroups[j].size <= allGroups[i].size) continue;
+      let subset = true;
+      for (const mt of allGroups[i].minterms) {
+        if (!allGroups[j].minterms.has(mt)) { subset = false; break; }
+      }
+      if (subset) { isPrime = false; break; }
+    }
+    if (isPrime) {
+      let dup = false;
+      for (const pi of pis) {
+        if (pi.minterms.size === allGroups[i].minterms.size) {
+          let same = true;
+          for (const mt of pi.minterms) {
+            if (!allGroups[i].minterms.has(mt)) { same = false; break; }
+          }
+          if (same) { dup = true; break; }
+        }
+      }
+      if (!dup) pis.push(allGroups[i]);
+    }
+  }
+
+  // Essential + greedy
+  const essential = new Set();
+  const covered = new Set();
+  for (const mt of targetSet) {
+    const covering = [];
+    for (let i = 0; i < pis.length; i++) {
+      if (pis[i].minterms.has(mt)) covering.push(i);
+    }
+    if (covering.length === 1) essential.add(covering[0]);
+  }
+  for (const i of essential) {
+    for (const mt of pis[i].minterms) { if (targetSet.has(mt)) covered.add(mt); }
+  }
+  const selected = new Set(essential);
+  const uncov = new Set([...targetSet].filter(m => !covered.has(m)));
+  while (uncov.size > 0) {
+    let bestIdx = -1, bestCount = 0;
+    for (let i = 0; i < pis.length; i++) {
+      if (selected.has(i)) continue;
+      let count = 0;
+      for (const mt of pis[i].minterms) { if (uncov.has(mt)) count++; }
+      if (count > bestCount) { bestCount = count; bestIdx = i; }
+    }
+    if (bestIdx === -1) break;
+    selected.add(bestIdx);
+    for (const mt of pis[bestIdx].minterms) uncov.delete(mt);
+  }
+
+  return [...selected].map(i => pis[i]);
+}
+
+// ── Draw group overlays on K-map ──
+function drawGroups() {
+  const container = document.getElementById('kmapContainer');
+  container.querySelectorAll('.group-overlay').forEach(el => el.remove());
+
+  const table = document.getElementById('kmapTable');
+  if (!table.rows.length) return;
+
+  for (const g of groups) {
+    // Need to handle wrapping — might need multiple overlays
+    const rects = getGroupRects(g);
+    for (const rect of rects) {
+      const div = document.createElement('div');
+      div.className = 'group-overlay';
+      div.style.left = rect.x + 'px';
+      div.style.top = rect.y + 'px';
+      div.style.width = rect.w + 'px';
+      div.style.height = rect.h + 'px';
+      div.style.border = `2.5px solid ${g.color}`;
+      div.style.background = g.color + '15';
+      container.appendChild(div);
+    }
+  }
+}
+
+function getGroupRects(group) {
+  const table = document.getElementById('kmapTable');
+  // Get cell positions (skip header row and column)
+  const rects = [];
+
+  // Check if group wraps around
+  const wrapsR = group.r0 + group.h > rows;
+  const wrapsC = group.c0 + group.w > cols;
+
+  // Split into non-wrapping sub-rectangles
+  const rRanges = [];
+  const cRanges = [];
+
+  if (wrapsR) {
+    rRanges.push([group.r0, rows - group.r0]);
+    rRanges.push([0, group.h - (rows - group.r0)]);
+  } else {
+    rRanges.push([group.r0, group.h]);
+  }
+
+  if (wrapsC) {
+    cRanges.push([group.c0, cols - group.c0]);
+    cRanges.push([0, group.w - (cols - group.c0)]);
+  } else {
+    cRanges.push([group.c0, group.w]);
+  }
+
+  for (const [rs, rh] of rRanges) {
+    for (const [cs, cw] of cRanges) {
+      // Get pixel coordinates from table cells
+      const topLeft = table.rows[rs + 1].cells[cs + 1]; // +1 for header
+      const botRight = table.rows[rs + rh].cells[cs + cw]; // last cell
+
+      const tl = topLeft.getBoundingClientRect();
+      const br = botRight.getBoundingClientRect();
+      const containerRect = document.getElementById('kmapContainer').getBoundingClientRect();
+
+      const pad = 4;
+      rects.push({
+        x: tl.left - containerRect.left + pad,
+        y: tl.top - containerRect.top + pad,
+        w: br.right - tl.left - pad * 2,
+        h: br.bottom - tl.top - pad * 2
+      });
+    }
+  }
+
+  return rects;
+}
+
+// ── Build steps text ──
+function buildSteps(allPIs, selected, essentialSet, selectedIdxs) {
+  const box = document.getElementById('stepsBox');
+  let html = '';
+
+  html += `<div class="step">Found <strong>${allPIs.length}</strong> prime implicant${allPIs.length !== 1 ? 's' : ''}.</div>`;
+
+  for (let i = 0; i < selected.length; i++) {
+    const g = selected[i];
+    const term = groupToTerm(g);
+    const mts = [...g.minterms].sort((a, b) => a - b).join(',');
+    const ess = g.essential ? ' <span class="essential">(essential)</span>' : '';
+    html += `<div class="step">`;
+    html += `<span class="group-tag" style="background:${g.color}30;color:${g.color}">G${i + 1}</span>`;
+    html += `<strong style="color:${g.color}">${term}</strong>`;
+    html += ` — covers m{${mts}}${ess}</div>`;
+  }
+
+  const sopTerms = selected.map(g => groupToTerm(g));
+  html += `<div class="step" style="margin-top:6px;padding-top:6px;border-top:1px solid #30363d">`;
+  html += `<strong>Result:</strong> F = ${sopTerms.join(' + ') || '0'}</div>`;
+
+  box.innerHTML = html;
+}
+
+// ── Draw gate diagram ──
+function drawGates(terms) {
+  const cvs = document.getElementById('gateCanvas');
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width, H = cvs.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (terms.length === 0) {
+    ctx.fillStyle = '#484f58';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('F = 0 (no gates needed)', W / 2, H / 2);
+    return;
+  }
+
+  if (terms.length === 1 && terms[0].term === '1') {
+    ctx.fillStyle = '#3fb950';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('F = 1 (constant high)', W / 2, H / 2);
+    return;
+  }
+
+  // Collect all unique input variables
+  const allVars = new Set();
+  for (const t of terms) {
+    for (const v of t.vars) {
+      allVars.add(v.name + (v.inverted ? "'" : ''));
+    }
+  }
+
+  const inputX = 40;
+  const andX = 240;
+  const orX = 480;
+  const outX = 620;
+
+  // Layout AND gates
+  const gateH = 36;
+  const gateGap = 8;
+  const totalGateH = terms.length * (gateH + gateGap) - gateGap;
+  const gateY0 = (H - totalGateH) / 2;
+
+  // Draw input lines on the left
+  const varList = [...allVars].sort();
+  const varGap = Math.min(20, (H - 40) / Math.max(varList.length, 1));
+  const varY0 = (H - varList.length * varGap) / 2;
+
+  ctx.font = '12px Courier New';
+  ctx.textAlign = 'right';
+
+  // Map variable name to Y position
+  const varYMap = {};
+  for (let i = 0; i < varList.length; i++) {
+    const y = varY0 + i * varGap + varGap / 2;
+    varYMap[varList[i]] = y;
+    // Input label
+    ctx.fillStyle = '#bc8cff';
+    ctx.fillText(varList[i], inputX - 8, y + 4);
+    // Horizontal line
+    ctx.strokeStyle = '#bc8cff40';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(inputX, y);
+    ctx.lineTo(andX - 20, y);
+    ctx.stroke();
+  }
+
+  // Draw AND gates and connections
+  const andOutYs = [];
+  for (let i = 0; i < terms.length; i++) {
+    const t = terms[i];
+    const gy = gateY0 + i * (gateH + gateGap);
+    const gcy = gy + gateH / 2;
+    andOutYs.push(gcy);
+
+    const color = GROUP_COLORS[i % GROUP_COLORS.length];
+
+    if (t.vars.length === 0) {
+      // Constant 1 — just a wire
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(andX - 20, gcy);
+      ctx.lineTo(andX + 50, gcy);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 11px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText('1', andX + 15, gcy + 4);
+    } else if (t.vars.length === 1) {
+      // Single variable — buffer/wire
+      const varKey = t.vars[0].name + (t.vars[0].inverted ? "'" : '');
+      const vy = varYMap[varKey] || gcy;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(andX - 20, vy);
+      ctx.lineTo(andX + 10, vy);
+      ctx.lineTo(andX + 10, gcy);
+      ctx.lineTo(andX + 50, gcy);
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = color;
+      ctx.font = '10px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.term, andX + 15, gy - 2);
+    } else {
+      // AND gate shape
+      ctx.fillStyle = '#21262d';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(andX, gy);
+      ctx.lineTo(andX + 30, gy);
+      ctx.arc(andX + 30, gcy, gateH / 2, -Math.PI / 2, Math.PI / 2);
+      ctx.lineTo(andX, gy + gateH);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // AND label
+      ctx.fillStyle = color;
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('AND', andX + 22, gcy + 3);
+
+      // Input wires to AND gate
+      const inputCount = t.vars.length;
+      for (let j = 0; j < inputCount; j++) {
+        const v = t.vars[j];
+        const varKey = v.name + (v.inverted ? "'" : '');
+        const vy = varYMap[varKey] || gcy;
+        const iy = gy + (j + 0.5) * gateH / inputCount;
+        ctx.strokeStyle = color + '80';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const bendX = andX - 20 + j * 3;
+        ctx.moveTo(inputX, vy);
+        ctx.lineTo(bendX, vy);
+        ctx.lineTo(bendX, iy);
+        ctx.lineTo(andX, iy);
+        ctx.stroke();
+        // dot at junction
+        ctx.beginPath();
+        ctx.arc(bendX, vy, 2, 0, Math.PI * 2);
+        ctx.fillStyle = color + '80';
+        ctx.fill();
+      }
+
+      // Output wire from AND
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(andX + 30 + gateH / 2, gcy);
+      ctx.lineTo(orX - 20, gcy);
+      ctx.stroke();
+
+      // Term label
+      ctx.fillStyle = color;
+      ctx.font = '10px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.term, (andX + 50 + orX - 20) / 2, gcy - 8);
+    }
+  }
+
+  // Draw OR gate (if more than one term)
+  const orCy = H / 2;
+  if (terms.length > 1) {
+    const orH = Math.min(totalGateH + 20, H - 20);
+    const orY = orCy - orH / 2;
+
+    // OR gate shape
+    ctx.fillStyle = '#21262d';
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(orX, orY);
+    ctx.quadraticCurveTo(orX + 15, orCy, orX, orY + orH);
+    ctx.quadraticCurveTo(orX + 50, orY + orH, orX + 60, orCy);
+    ctx.quadraticCurveTo(orX + 50, orY, orX, orY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#3fb950';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('OR', orX + 28, orCy + 4);
+
+    // Wires from AND outputs to OR inputs
+    for (let i = 0; i < terms.length; i++) {
+      const t = terms[i];
+      const gcy2 = andOutYs[i];
+      const color = GROUP_COLORS[i % GROUP_COLORS.length];
+
+      const iy = orY + (i + 0.5) * orH / terms.length;
+      // Find the x where the OR gate curve is at this y
+      const normY = (iy - orY) / orH; // 0..1
+      const curveX = orX + 15 * Math.sin(normY * Math.PI) * 0.5;
+
+      ctx.strokeStyle = color + '80';
+      ctx.lineWidth = 1;
+      if (t.vars.length <= 1) {
+        // From buffer output
+        ctx.beginPath();
+        ctx.moveTo(andX + 50, gcy2);
+        ctx.lineTo(orX - 5, gcy2);
+        ctx.lineTo(orX - 5, iy);
+        ctx.lineTo(curveX + 4, iy);
+        ctx.stroke();
+      } else {
+        // Already drawn to orX - 20, just extend
+        ctx.beginPath();
+        ctx.moveTo(orX - 20, gcy2);
+        ctx.lineTo(orX - 5, gcy2);
+        ctx.lineTo(orX - 5, iy);
+        ctx.lineTo(curveX + 4, iy);
+        ctx.stroke();
+      }
+    }
+
+    // Output wire
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(orX + 60, orCy);
+    ctx.lineTo(outX, orCy);
+    ctx.stroke();
+  } else {
+    // Single term — wire straight through
+    const gcy2 = andOutYs[0];
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2;
+    if (terms[0].vars.length <= 1) {
+      ctx.beginPath();
+      ctx.moveTo(andX + 50, gcy2);
+      ctx.lineTo(outX, gcy2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(andX + 30 + gateH / 2, gcy2);
+      ctx.lineTo(outX, gcy2);
+      ctx.stroke();
+    }
+  }
+
+  // Output label
+  const fy = terms.length > 1 ? orCy : andOutYs[0];
+  ctx.fillStyle = '#3fb950';
+  ctx.font = 'bold 14px Courier New';
+  ctx.textAlign = 'left';
+  ctx.fillText('F', outX + 6, fy + 5);
+
+  // Output dot
+  ctx.beginPath();
+  ctx.arc(outX, fy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#3fb950';
+  ctx.fill();
+}
+
+// ── Tab switching ──
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    numVars = +tab.dataset.vars;
+    cells = new Array((1 << numVars)).fill(0);
+    init();
+  });
+});
+
+// ── Button handlers ──
+document.getElementById('btnAllZero').onclick = () => { cells.fill(0); init(); };
+document.getElementById('btnAllOne').onclick = () => { cells.fill(1); init(); };
+document.getElementById('btnRandom').onclick = () => {
+  cells = cells.map(() => Math.random() < 0.4 ? 1 : Math.random() < 0.1 ? 2 : 0);
+  init();
+};
+document.getElementById('btnInvert').onclick = () => {
+  cells = cells.map(v => v === 1 ? 0 : v === 0 ? 1 : v);
+  init();
+};
+document.getElementById('btnClear').onclick = () => {
+  cells = cells.map(v => v === 2 ? 0 : v);
+  init();
+};
+
+// ── Presets ──
+function setupPresets() {
+  const box = document.getElementById('presetBox');
+  const presets2 = [
+    { name: 'AND', fn: m => (m & 1) && (m & 2) ? 1 : 0 },
+    { name: 'OR', fn: m => (m & 1) || (m & 2) ? 1 : 0 },
+    { name: 'XOR', fn: m => ((m >> 1) ^ (m & 1)) & 1 },
+    { name: 'NAND', fn: m => !((m & 1) && (m & 2)) ? 1 : 0 },
+  ];
+  const presets3 = [
+    { name: 'Majority', fn: m => { let b = 0; for(let i=0;i<3;i++) b += (m>>i)&1; return b >= 2 ? 1 : 0; }},
+    { name: 'XOR₃', fn: m => ((m>>2)^(m>>1)^m) & 1 },
+    { name: '2-to-1 MUX', fn: m => { const s=(m>>2)&1, a=(m>>1)&1, b=m&1; return s ? b : a; }},
+    { name: 'A·B + C', fn: m => ((m>>2)&1)&((m>>1)&1) | (m&1) ? 1 : 0 },
+  ];
+  const presets4 = [
+    { name: 'Majority₄', fn: m => { let b=0; for(let i=0;i<4;i++) b+=(m>>i)&1; return b>=3?1:0; }},
+    { name: 'Parity₄', fn: m => { let b=0; for(let i=0;i<4;i++) b^=(m>>i)&1; return b; }},
+    { name: 'BCD valid', fn: m => m <= 9 ? 1 : 0 },
+    { name: 'BCD ≥ 5', fn: m => m >= 5 && m <= 9 ? 1 : m > 9 ? 2 : 0 },
+    { name: "A'B + CD'", fn: m => {
+      const a=(m>>3)&1,b=(m>>2)&1,c=(m>>1)&1,d=m&1;
+      return (!a&&b)||(c&&!d)?1:0;
+    }},
+    { name: 'AB + A\'C + BCD', fn: m => {
+      const a=(m>>3)&1,b=(m>>2)&1,c=(m>>1)&1,d=m&1;
+      return (a&&b)||(!a&&c)||(b&&c&&d)?1:0;
+    }},
+  ];
+
+  const presetMap = { 2: presets2, 3: presets3, 4: presets4 };
+  const presets = presetMap[numVars] || [];
+
+  box.innerHTML = '';
+  for (const p of presets) {
+    const el = document.createElement('div');
+    el.className = 'preset';
+    el.textContent = p.name;
+    el.addEventListener('click', () => {
+      const total = 1 << numVars;
+      for (let m = 0; m < total; m++) {
+        // Map minterm to k-map cell
+        const rVal = m >> colBits;
+        const cVal = m & ((1 << colBits) - 1);
+        const r = grayRow.indexOf(rVal);
+        const c = grayCol.indexOf(cVal);
+        cells[r * cols + c] = p.fn(m);
+      }
+      init();
+    });
+    box.appendChild(el);
+  }
+}
+
+// ── Window resize: redraw overlays ──
+window.addEventListener('resize', () => {
+  requestAnimationFrame(() => drawGroups());
+});
+
+// ── Initial setup ──
+function fullInit() {
+  init();
+  setupPresets();
+}
+
+fullInit();
+
+// Redraw group overlays after table renders
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => drawGroups());
+});
+</script>
+</body>
+</html>
