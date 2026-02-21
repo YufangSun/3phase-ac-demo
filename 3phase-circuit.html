@@ -17,9 +17,10 @@
   .tab:hover{border-color:#58a6ff;color:#e6edf3}
   .tab.active{background:#1f6feb;border-color:#1f6feb;color:white;font-weight:bold}
 
-  .main{max-width:960px;width:100%;margin-top:8px}
+  .main{max-width:1060px;width:100%;margin-top:8px}
   .row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
   .panel{background:#161b22;border-radius:12px;padding:16px;border:1px solid #30363d;margin-bottom:12px;flex:1;min-width:300px}
+  .panel-full{flex-basis:100%}
   .panel h2{font-size:.9em;color:#8b949e;margin-bottom:8px;text-align:center}
   canvas{display:block;margin:0 auto;border-radius:8px}
 
@@ -94,19 +95,19 @@
 
 <div class="main">
   <div class="row">
-    <div class="panel">
+    <div class="panel panel-full">
       <h2>Circuit Diagram</h2>
-      <canvas id="circuitCanvas" width="560" height="380"></canvas>
-    </div>
-    <div class="panel">
-      <h2>Phasor Diagram</h2>
-      <canvas id="phasorCanvas" width="340" height="320"></canvas>
+      <canvas id="circuitCanvas" width="1020" height="420"></canvas>
     </div>
   </div>
   <div class="row">
     <div class="panel">
+      <h2>Phasor Diagram</h2>
+      <canvas id="phasorCanvas" width="340" height="320"></canvas>
+    </div>
+    <div class="panel">
       <h2>Waveforms</h2>
-      <canvas id="waveCanvas" width="920" height="240"></canvas>
+      <canvas id="waveCanvas" width="620" height="320"></canvas>
     </div>
   </div>
 </div>
@@ -279,7 +280,7 @@ function updateResults() {
   document.getElementById('formulaBox').innerHTML = f;
 }
 
-// ── Circuit Diagram (detailed) ──
+// ── Circuit Diagram (detailed, wide layout) ──
 function drawCircuit() {
   const W = circuitC.width, H = circuitC.height;
   const ctx = cCtx;
@@ -289,20 +290,31 @@ function drawCircuit() {
   const ldY  = res.loadType === 'y';
   const pc = [COLORS.a, COLORS.b, COLORS.c];
 
-  // Layout constants
-  const cy  = 195;   // vertical center
-  const sp  = 80;    // vertical spacing between phase lines
-  const srcX = 120;  // source center x
-  const ldX  = 440;  // load center x
-  const lineL = 195; // line wire left x (source terminal)
-  const lineR = 365; // line wire right x (load terminal)
+  // Layout — use full 1020 × 420 canvas
+  const cy  = 210;    // vertical center
+  const sp  = 100;    // vertical spacing between phase lines
+  const srcX = 170;   // source center x
+  const ldX  = 760;   // load center x
+  const lineL = 310;  // line wire left x (source terminal)
+  const lineR = 620;  // line wire right x (load terminal)
+
+  // ── Background region boxes ──
+  ctx.fillStyle = '#161b2210';
+  ctx.strokeStyle = '#30363d40'; ctx.lineWidth = 1; ctx.setLineDash([6,4]);
+  // Source box
+  roundRect(ctx, 20, 40, lineL - 40, H - 60, 12); ctx.fill(); ctx.stroke();
+  // Load box
+  roundRect(ctx, lineR + 20, 40, W - lineR - 40, H - 60, 12); ctx.fill(); ctx.stroke();
+  ctx.setLineDash([]);
 
   // ── Title labels ──
-  ctx.font = 'bold 13px sans-serif';
+  ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#e6edf3';
-  ctx.fillText(srcY ? 'Y Source' : 'Δ Source', srcX, 24);
-  ctx.fillText(ldY ? 'Y Load' : 'Δ Load', ldX, 24);
+  ctx.fillText(srcY ? 'Y Source' : 'Δ Source', srcX, 30);
+  ctx.fillText(ldY ? 'Y Load' : 'Δ Load', ldX, 30);
+  ctx.fillStyle = '#484f58'; ctx.font = '11px sans-serif';
+  ctx.fillText('Line Conductors', (lineL + lineR) / 2, 30);
 
   // ── Phase terminal positions ──
   const yA = cy - sp, yB = cy, yC = cy + sp;
@@ -310,235 +322,248 @@ function drawCircuit() {
 
   // ═══ Draw Source ═══
   if (srcY) {
-    // Neutral point
-    const nx = srcX - 55;
-    // Draw three branches from neutral to terminals
+    const nx = srcX - 80;
     for (let i = 0; i < 3; i++) {
       const y = ys[i];
-      // Wire from neutral to source symbol
+      // Wire neutral → branch
       ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx + 18, y); ctx.stroke();
-      // AC source circle
-      drawACSourceH(ctx, nx + 18, y, srcX + 30, y, pc[i]);
-      // Wire from source to terminal
-      ctx.beginPath(); ctx.moveTo(srcX + 30 + 14, y); ctx.lineTo(lineL, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx + 30, y); ctx.stroke();
+      // AC source circle (bigger, more space)
+      drawACSourceH(ctx, nx + 30, y, srcX + 55, y, pc[i], 16);
+      // Wire source → terminal
+      ctx.beginPath(); ctx.moveTo(srcX + 55 + 16, y); ctx.lineTo(lineL, y); ctx.stroke();
       // Terminal dot
-      drawDot(ctx, lineL, y, pc[i]);
+      drawDot(ctx, lineL, y, pc[i], 4);
       // + / − polarity
-      ctx.fillStyle = pc[i]; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('+', nx + 28, y - 14); ctx.fillText('−', srcX + 20, y - 14);
+      ctx.fillStyle = pc[i]; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('+', nx + 48, y - 18); ctx.fillText('−', srcX + 38, y - 18);
       // Phase label at terminal
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(LABELS[i], lineL + 1, y - 10);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(LABELS[i], lineL, y - 14);
+      // Vφ per-phase value
+      ctx.font = '10px sans-serif'; ctx.fillStyle = '#58a6ff80';
+      ctx.fillText(fmtV(res.VpS) + ' V', (nx + 30 + srcX + 55) / 2, y + 28);
     }
     // Neutral dot & label
-    drawDot(ctx, nx, cy, '#8b949e');
-    ctx.fillStyle = '#8b949e'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right';
-    ctx.fillText('N', nx - 8, cy + 4);
-    // Neutral wire down (dashed)
-    ctx.strokeStyle = '#8b949e40'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx, cy + sp + 30); ctx.stroke();
+    drawDot(ctx, nx, cy, '#8b949e', 5);
+    ctx.fillStyle = '#8b949e'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('N', nx - 10, cy + 5);
+    // Neutral wire down
+    ctx.strokeStyle = '#8b949e50'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx, cy + sp + 35); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#8b949e'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('neutral', nx, cy + sp + 42);
+    ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('neutral', nx, cy + sp + 50);
     // Vφ annotation
-    drawVAnnotation(ctx, nx + 4, cy - 4, nx + 4, yA + 4, 'Vφs', '#58a6ff', -18);
+    drawVAnnotation(ctx, nx - 2, cy - 6, nx - 2, yA + 6, 'Vφ,src', '#58a6ff', -22);
   } else {
-    // Delta source: three sources forming a triangle
-    const dx = srcX - 30;  // left side of delta
-    const rx = srcX + 40;  // connection points going right
+    const dx = srcX - 50;
     for (let i = 0; i < 3; i++) {
       const j = (i + 1) % 3;
-      // Vertical delta branch
       const my = (ys[i] + ys[j]) / 2;
       ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 14); ctx.stroke();
-      drawACSourceV(ctx, dx, my, pc[i]);
-      ctx.beginPath(); ctx.moveTo(dx, my + 14); ctx.lineTo(dx, ys[j]); ctx.stroke();
-      // Horizontal wire from junction to terminal
+      // Vertical wire above source
+      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 18); ctx.stroke();
+      drawACSourceV(ctx, dx, my, pc[i], 16);
+      // Vertical wire below source
+      ctx.beginPath(); ctx.moveTo(dx, my + 18); ctx.lineTo(dx, ys[j]); ctx.stroke();
+      // Horizontal wire junction → terminal
       ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(lineL, ys[i]); ctx.stroke();
-      // Terminal dot
-      drawDot(ctx, lineL, ys[i], pc[i]);
+      drawDot(ctx, dx, ys[i], pc[i], 4);
+      drawDot(ctx, lineL, ys[i], pc[i], 4);
       // Phase label
-      ctx.fillStyle = pc[i]; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(LABELS[i], lineL + 1, ys[i] - 10);
+      ctx.fillStyle = pc[i]; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(LABELS[i], lineL, ys[i] - 14);
       // Polarity
-      ctx.font = '9px sans-serif';
-      ctx.fillText('+', dx - 12, my - 10); ctx.fillText('−', dx - 12, my + 14);
+      ctx.font = '10px sans-serif';
+      ctx.fillText('+', dx - 16, my - 14); ctx.fillText('−', dx - 16, my + 18);
     }
-    // Vφ annotation
-    drawVAnnotation(ctx, dx - 20, ys[0] + 4, dx - 20, ys[1] - 4, 'Vφs', '#58a6ff', -18);
+    drawVAnnotation(ctx, dx - 26, ys[0] + 6, dx - 26, ys[1] - 6, 'Vφ,src', '#58a6ff', -20);
   }
 
   // ═══ Draw Line Wires ═══
   for (let i = 0; i < 3; i++) {
     const y = ys[i];
-    ctx.strokeStyle = pc[i]; ctx.lineWidth = 2.5;
+    ctx.strokeStyle = pc[i]; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(lineL, y); ctx.lineTo(lineR, y); ctx.stroke();
-    // Current arrow
+    // Current arrow (larger)
     const ax = (lineL + lineR) / 2;
     ctx.fillStyle = pc[i];
     ctx.beginPath();
-    ctx.moveTo(ax + 8, y); ctx.lineTo(ax - 4, y - 5); ctx.lineTo(ax - 4, y + 5);
+    ctx.moveTo(ax + 12, y); ctx.lineTo(ax - 5, y - 6); ctx.lineTo(ax - 5, y + 6);
     ctx.closePath(); ctx.fill();
-    // IL label
-    ctx.fillStyle = '#f78166'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('I' + LABELS[i], ax, y - 9);
+    // IL label above
+    ctx.fillStyle = '#f78166'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('I_' + LABELS[i], ax, y - 12);
   }
-  // IL magnitude label
-  ctx.fillStyle = '#f78166'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('I_L = ' + fmtV(res.IlL) + ' A', (lineL + lineR) / 2, yC + 20);
+  // IL magnitude label below lines
+  ctx.fillStyle = '#f78166'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('I_L = ' + fmtV(res.IlL) + ' A', (lineL + lineR) / 2, yC + 24);
 
-  // ═══ Draw VL annotation between lines A and B ═══
-  const vlx = lineL + 18;
-  drawVAnnotation(ctx, vlx, yA + 6, vlx, yB - 6, 'V_L', '#d29922', -18);
+  // ═══ VL annotation between lines A–B ═══
+  drawVAnnotation(ctx, lineL + 30, yA + 8, lineL + 30, yB - 8, 'V_L', '#d29922', -20);
+  // VL value
+  ctx.fillStyle = '#d2992290'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(fmtV(res.VlL) + ' V', lineL + 10, (yA + yB) / 2);
 
   // ═══ Draw Load ═══
   if (ldY) {
-    const nx = ldX + 55;
+    const nx = ldX + 100;
     for (let i = 0; i < 3; i++) {
       const y = ys[i];
-      // Wire from terminal to impedance
+      // Wire terminal → impedance
       ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(lineR, y); ctx.lineTo(ldX - 32, y); ctx.stroke();
-      drawDot(ctx, lineR, y, pc[i]);
-      // Impedance zigzag
-      drawZigzagH(ctx, ldX - 32, y, ldX + 32, y, pc[i]);
-      // Wire from impedance to neutral
-      ctx.beginPath(); ctx.moveTo(ldX + 32, y); ctx.lineTo(nx, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lineR, y); ctx.lineTo(ldX - 48, y); ctx.stroke();
+      drawDot(ctx, lineR, y, pc[i], 4);
+      // Impedance zigzag (wider)
+      drawZigzagH(ctx, ldX - 48, y, ldX + 48, y, pc[i]);
+      // Wire impedance → neutral
+      ctx.beginPath(); ctx.moveTo(ldX + 48, y); ctx.lineTo(nx, y); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(nx, y); ctx.lineTo(nx, cy); ctx.stroke();
       // Iφ label
-      ctx.fillStyle = pc[i]; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Iφ' + LABELS[i], ldX, y - 12);
+      ctx.fillStyle = pc[i]; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Iφ' + LABELS[i], ldX, y - 16);
       // Phase label at terminal
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(LABELS[i], lineR - 1, y - 10);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(LABELS[i], lineR, y - 14);
+      // Iφ value
+      ctx.font = '10px sans-serif'; ctx.fillStyle = pc[i] + '80';
+      ctx.fillText(fmtV(res.IpL) + ' A', ldX, y + 28);
     }
     // Neutral dot & label
-    drawDot(ctx, nx, cy, '#8b949e');
-    ctx.fillStyle = '#8b949e'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('N', nx + 8, cy + 4);
+    drawDot(ctx, nx, cy, '#8b949e', 5);
+    ctx.fillStyle = '#8b949e'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('N', nx + 10, cy + 5);
     // Neutral wire down
-    ctx.strokeStyle = '#8b949e40'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx, cy + sp + 30); ctx.stroke();
+    ctx.strokeStyle = '#8b949e50'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(nx, cy); ctx.lineTo(nx, cy + sp + 35); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#8b949e'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('neutral', nx, cy + sp + 42);
+    ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('neutral', nx, cy + sp + 50);
     // Vφ annotation
-    drawVAnnotation(ctx, nx - 4, cy + 4, nx - 4, yA + 4, 'Vφl', '#3fb950', 14);
+    drawVAnnotation(ctx, nx - 6, cy + 6, nx - 6, yA + 6, 'Vφ,load', '#3fb950', 16);
     // Z label
-    ctx.fillStyle = '#d2a8ff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', ldX, yC + 20);
+    ctx.fillStyle = '#d2a8ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', ldX, yC + 28);
   } else {
     // Delta load
-    const dx = ldX + 30;
+    const dx = ldX + 50;
     for (let i = 0; i < 3; i++) {
       const j = (i + 1) % 3;
       const y = ys[i];
-      // Wire from terminal to junction
+      // Wire terminal → junction
       ctx.strokeStyle = pc[i]; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(lineR, y); ctx.lineTo(dx, y); ctx.stroke();
-      drawDot(ctx, lineR, y, pc[i]);
-      drawDot(ctx, dx, y, pc[i]);
-      // Delta branch: vertical impedance between phase i and j
+      drawDot(ctx, lineR, y, pc[i], 4);
+      drawDot(ctx, dx, y, pc[i], 4);
+      // Delta branch: vertical impedance between i and j
       const my = (ys[i] + ys[j]) / 2;
-      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 22); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(dx, ys[i]); ctx.lineTo(dx, my - 28); ctx.stroke();
       drawZigzagV(ctx, dx, my, pc[i]);
-      ctx.beginPath(); ctx.moveTo(dx, my + 22); ctx.lineTo(dx, ys[j]); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(dx, my + 28); ctx.lineTo(dx, ys[j]); ctx.stroke();
       // Iφ label
-      ctx.fillStyle = pc[i]; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText('Iφ' + LABELS[i] + LABELS[j], dx + 8, my + 3);
+      ctx.fillStyle = pc[i]; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('Iφ' + LABELS[i] + LABELS[j], dx + 16, my + 4);
+      // Iφ value
+      ctx.font = '10px sans-serif'; ctx.fillStyle = pc[i] + '80';
+      ctx.fillText(fmtV(res.IpL) + ' A', dx + 16, my + 18);
       // Phase label at terminal
-      ctx.fillStyle = pc[i]; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(LABELS[i], lineR - 1, y - 10);
+      ctx.fillStyle = pc[i]; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(LABELS[i], lineR, y - 14);
     }
     // Vφ annotation
-    drawVAnnotation(ctx, dx + 4, ys[0] + 6, dx + 4, ys[1] - 6, 'Vφl', '#3fb950', 16);
+    drawVAnnotation(ctx, dx + 6, ys[0] + 8, dx + 6, ys[1] - 8, 'Vφ,load', '#3fb950', 18);
     // Z label
-    ctx.fillStyle = '#d2a8ff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', dx + 4, yC + 20);
+    ctx.fillStyle = '#d2a8ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Z = ' + res.Zm + '∠' + (res.Za * 180 / Math.PI).toFixed(0) + '°', dx + 6, yC + 28);
   }
+
+  // ═══ Config summary at bottom ═══
+  const cfgNames = {yy:'Y – Y', yd:'Y – Δ', dd:'Δ – Δ', dy:'Δ – Y'};
+  ctx.fillStyle = '#484f58'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(cfgNames[cfg] + '  |  V_L = ' + fmtV(res.VlL) + ' V  |  I_L = ' + fmtV(res.IlL) + ' A  |  P = ' + fmtV(res.P) + ' W', W / 2, H - 10);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 // ── Drawing helpers ──
 
-function drawDot(ctx, x, y, color) {
-  ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+function drawDot(ctx, x, y, color, r) {
+  r = r || 3.5;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = color; ctx.fill();
   ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 1; ctx.stroke();
 }
 
-function drawACSourceH(ctx, x1, y, x2, y2, color) {
-  // Horizontal AC source: circle with sine wave, centered between x1 and x2
-  const cx = (x1 + x2) / 2, r = 13;
-  // Wires to circle
+function drawACSourceH(ctx, x1, y, x2, y2, color, r) {
+  r = r || 13;
+  const cx = (x1 + x2) / 2;
   ctx.strokeStyle = color; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(cx - r, y); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(cx + r, y); ctx.lineTo(x2, y); ctx.stroke();
-  // Circle
   ctx.beginPath(); ctx.arc(cx, y, r, 0, Math.PI * 2);
   ctx.fillStyle = '#0d1117'; ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
   // Sine wave inside
   ctx.strokeStyle = color; ctx.lineWidth = 1.5;
   ctx.beginPath();
-  for (let t = -1; t <= 1; t += 0.05) {
-    const px = cx + t * (r - 3);
-    const py = y - Math.sin(t * Math.PI) * (r * 0.45);
+  for (let t = -1; t <= 1; t += 0.04) {
+    const px = cx + t * (r - 4);
+    const py = y - Math.sin(t * Math.PI) * (r * 0.5);
     t === -1 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   }
   ctx.stroke();
 }
 
-function drawACSourceV(ctx, x, my, color) {
-  // Vertical AC source
-  const r = 13;
+function drawACSourceV(ctx, x, my, color, r) {
+  r = r || 13;
   ctx.beginPath(); ctx.arc(x, my, r, 0, Math.PI * 2);
   ctx.fillStyle = '#0d1117'; ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.stroke();
-  // Sine wave inside (rotated 90°)
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
   ctx.strokeStyle = color; ctx.lineWidth = 1.5;
   ctx.beginPath();
-  for (let t = -1; t <= 1; t += 0.05) {
-    const py = my + t * (r - 3);
-    const px = x + Math.sin(t * Math.PI) * (r * 0.45);
+  for (let t = -1; t <= 1; t += 0.04) {
+    const py = my + t * (r - 4);
+    const px = x + Math.sin(t * Math.PI) * (r * 0.5);
     t === -1 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   }
   ctx.stroke();
 }
 
 function drawZigzagH(ctx, x1, y, x2, y2, color) {
-  // Horizontal zigzag impedance symbol
   const len = x2 - x1;
-  const segs = 6;
+  const segs = 7;
   const segW = len / segs;
-  const amp = 8;
+  const amp = 10;
   ctx.strokeStyle = color; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x1, y);
   for (let s = 0; s < segs; s++) {
     const sx = x1 + s * segW;
-    if (s === 0) {
-      ctx.lineTo(sx + segW * 0.25, y - amp);
-    } else {
-      ctx.lineTo(sx + segW * 0.25, y - amp);
-    }
+    ctx.lineTo(sx + segW * 0.25, y - amp);
     ctx.lineTo(sx + segW * 0.75, y + amp);
     ctx.lineTo(sx + segW, y);
   }
   ctx.stroke();
-  // Z label
-  ctx.fillStyle = color; ctx.font = 'bold 10px sans-serif';
+  // Z label below
+  ctx.fillStyle = color; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('Z', (x1 + x2) / 2, y + amp + 12);
+  ctx.fillText('Z', (x1 + x2) / 2, y + amp + 14);
   ctx.textBaseline = 'alphabetic';
 }
 
 function drawZigzagV(ctx, x, my, color) {
-  // Vertical zigzag impedance symbol
-  const halfH = 20;
-  const segs = 5;
+  const halfH = 26;
+  const segs = 6;
   const segH = (halfH * 2) / segs;
-  const amp = 7;
+  const amp = 9;
   const y1 = my - halfH;
   ctx.strokeStyle = color; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x, y1);
@@ -549,33 +574,27 @@ function drawZigzagV(ctx, x, my, color) {
     ctx.lineTo(x, sy + segH);
   }
   ctx.stroke();
-  // Z label
-  ctx.fillStyle = color; ctx.font = 'bold 10px sans-serif';
+  ctx.fillStyle = color; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText('Z', x + amp + 4, my);
+  ctx.fillText('Z', x + amp + 6, my);
   ctx.textBaseline = 'alphabetic';
 }
 
 function drawVAnnotation(ctx, x1, y1, x2, y2, label, color, offsetX) {
-  // Voltage annotation arrow between two points
   ctx.strokeStyle = color + '90'; ctx.lineWidth = 1.2;
   ctx.setLineDash([3, 3]);
   ctx.beginPath(); ctx.moveTo(x1 + offsetX, y1); ctx.lineTo(x2 + offsetX, y2); ctx.stroke();
   ctx.setLineDash([]);
-  // Arrowheads
-  const headL = 5;
+  const headL = 6;
   ctx.fillStyle = color + '90';
-  // Top arrow (pointing up)
   ctx.beginPath();
   ctx.moveTo(x1 + offsetX, y1); ctx.lineTo(x1 + offsetX - 3, y1 + headL); ctx.lineTo(x1 + offsetX + 3, y1 + headL);
   ctx.closePath(); ctx.fill();
-  // Bottom arrow (pointing down)
   ctx.beginPath();
   ctx.moveTo(x2 + offsetX, y2); ctx.lineTo(x2 + offsetX - 3, y2 - headL); ctx.lineTo(x2 + offsetX + 3, y2 - headL);
   ctx.closePath(); ctx.fill();
-  // Label
-  ctx.fillStyle = color; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(label, (x1 + x2) / 2 + offsetX, (y1 + y2) / 2 - 2);
+  ctx.fillStyle = color; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(label, (x1 + x2) / 2 + offsetX, (y1 + y2) / 2 - 3);
 }
 
 // ── Phasor Diagram ──
